@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn 
+
+
 
 
 class Brain(nn.Module):
@@ -9,9 +12,9 @@ class Brain(nn.Module):
         self.layer3=nn.Linear(64,output_size)
 
     def forward(self,x):
-        x=nn.ReLU()(self.layer1(x))
-        x=nn.ReLU()(self.layer2(x))
-        x=nn.Tanh()(self.layer3(x))
+        x=torch.relu(self.layer1(x))
+        x=torch.relu(self.layer2(x))
+        x=torch.tanh(self.layer3(x))
         return x
     
     

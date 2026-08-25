@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+*.pt
+videos_ia*/
+elite_mutant/
+mutants_d_elite/
+champion_raffine/
