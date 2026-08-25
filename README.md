@@ -31,6 +31,18 @@ Each creature is controlled by a PyTorch Neural Network taking relative node coo
 - PyTorch (CUDA or MPS enabled for parallel batch training)
 - Pygame & OpenCV (for visualization and video export only)
 
+## 📊 Current Status
+
+The optimisation infrastructure is operational end-to-end: topology mutation,
+GPU-batched rollouts, and gradient flow through the simulator all work as intended.
+
+**Learned behaviour has not yet converged to sustained swimming.** Current champions
+converge to a local optimum: a single large initial impulse followed by passive drift,
+which maximises early displacement reward without paying continued energy cost.
+
+Ongoing work targets this failure mode — reward shaping (rewarding sustained velocity
+rather than cumulative displacement), exploration strategy, and the energy penalty schedule.
+
 ### Running the Training
 To launch the headless evolutionary training loop across a batch of 100 creatures:
 ```bash
