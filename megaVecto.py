@@ -47,10 +47,10 @@ class MegaCrea:
     def apply_physics(self, dt):
         
         # --- ÉTAPE 1 : LECTURE (gather) ---
-        m1_exp = self.muscle1.unsqueeze(1).expand(-1, self.batch_size, -1)
+        m1_exp = self.muscle1.unsqueeze(1).expand(-1, self.batch_size, -1)  #[pop,batch_size,max_muscles]
         m2_exp = self.muscle2.unsqueeze(1).expand(-1, self.batch_size, -1)
 
-        X1 = torch.gather(self.X, dim=2, index=m1_exp)
+        X1 = torch.gather(self.X, dim=2, index=m1_exp)   # [POP, batch_size,Max_muscles]
         Y1 = torch.gather(self.Y, dim=2, index=m1_exp)
         X2 = torch.gather(self.X, dim=2, index=m2_exp)
         Y2 = torch.gather(self.Y, dim=2, index=m2_exp)
@@ -61,7 +61,7 @@ class MegaCrea:
         vY2 = torch.gather(self.vY, dim=2, index=m2_exp)
 
         # --- ÉTAPE 2 : GÉOMÉTRIE ---
-        dx = X2 - X1
+        dx = X2 - X1      #[pop,batch,maxmuscle]
         dy = Y2 - Y1
         distances = torch.sqrt(torch.square(dx) + torch.square(dy) + 1e-3)
 
@@ -180,7 +180,7 @@ class MegaCrea:
         L'action venant du réseau aura la forme [POP_SIZE, BATCH_SIZE, MAX_MUSCLES]
         """
         base = self.base_length.unsqueeze(1).expand(-1, self.batch_size, -1)
-        new_lengths = torch.clamp(0.85 * base - 0.3 * base * action, min=0.3 * base)
+        new_lengths = torch.clamp(base - 0.3 * base * action, min=0.3 * base)
         
         # torch.where permet de ne modifier QUE les vrais muscles, 
         # et de laisser la cible intacte pour les os / fantômes
@@ -193,7 +193,7 @@ class MegaCrea:
         
         
         # L'énergie accumulée sur la dimension 2 (les muscles) pour obtenir [POP, BATCH]
-        energy_step = torch.sum(torch.abs(base * action) * self.mask_vrais_M_exp, dim=2)
+        energy_step = torch.sum(torch.abs(new_lengths-base ) * self.mask_vrais_M_exp, dim=2)
         self.energy = self.energy + energy_step
         self.total_energy = self.total_energy + energy_step
 

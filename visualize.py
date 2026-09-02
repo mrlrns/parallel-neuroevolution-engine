@@ -1,5 +1,5 @@
 import os
-os.environ["SDL_VIDEODRIVER"] = "dummy"
+##os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 import pygame
 import sys
@@ -32,7 +32,7 @@ BLANC = (255, 255, 255)
 ROUGE_MUSCLE = (200, 50, 50)
 
 # Remplace par le nom exact de ton fichier de champion dans le dossier elite_mutant
-chemin_fichier = "elite_mutant/champion_gen_29_score_153.6_family_3.pt"
+chemin_fichier = "elite_mutant/raffine_ep100_score_427.9.pt"
 donnees = torch.load(chemin_fichier, map_location=device)
 
 print("✅ Sauvegarde chargée ! Reconstruction du mutant...")
@@ -88,7 +88,7 @@ cerveau.eval()
 
 os.makedirs("videos_ia_(5FRAMES)", exist_ok=True)
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-chemin_video = f"videos_ia_(5FRAMES)/episode_15FRAMES.mp4"
+chemin_video = f"videos_ia_(5FRAMES)/episode_15FRAMES2.mp4"
 video_writer = cv2.VideoWriter(chemin_video, fourcc, 60.0, (largeur, hauteur))
 
 with torch.no_grad():
@@ -121,7 +121,8 @@ with torch.no_grad():
         if frame % 5 == 0:
             obs = champion.get_observation(frame)          # [1, 1, obs_size]
             obs_flat = obs.reshape(1, obs_size)             # aplati pour le forward classique
-            action = cerveau(obs_flat)                      # [1, action_size]
+            action = cerveau(obs_flat)  
+            print (action.mean())                    # [1, action_size]
             action = action.reshape(1, 1, action_size)       # reforme pour apply_action
             champion.apply_action(action,frame)
 
