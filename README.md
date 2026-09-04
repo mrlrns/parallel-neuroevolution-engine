@@ -1,7 +1,5 @@
 # 🧬 Massively Parallel Neuroevolution for Aquatic Soft-Body Locomotion
 
-*(Note: I will soon add a GIF showing the elite mutant swimming)*
-
 ## 🚀 Overview
 
 This repository implements a custom, fully vectorized 2D physics engine built from scratch in PyTorch to simulate soft-body aquatic creatures.
