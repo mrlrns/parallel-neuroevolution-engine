@@ -31,8 +31,10 @@ NOIR = (30, 30, 30)
 BLANC = (255, 255, 255)
 ROUGE_MUSCLE = (200, 50, 50)
 
-# Remplace par le nom exact de ton fichier de champion dans le dossier elite_mutant
-chemin_fichier = "elite_mutant/raffine_ep100_score_427.9.pt"
+# Champion issu de train.py     -> elite_mutant/
+# Champion raffiné par train2.py -> champion_raffine/
+chemin_fichier = "champion_raffine/raffine_ep100_score_427.9.pt"
+
 donnees = torch.load(chemin_fichier, map_location=device)
 
 print("✅ Sauvegarde chargée ! Reconstruction du mutant...")
