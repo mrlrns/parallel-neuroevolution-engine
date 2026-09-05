@@ -8,26 +8,32 @@ Instead of relying on standard loops or pre-built engines, this project leverage
 
 ## 📊 Current Status
 
-The optimisation infrastructure is operational end-to-end, and after fixing
-the actuation neutral point the creatures **do swim** — continuous body
-deformation producing net forward motion.
+The optimisation infrastructure is operational end-to-end, and after fixing the
+actuation neutral point the creatures **do swim** — continuous body deformation
+producing net forward motion.
 
-Phase 2 (controller refinement on a frozen morphology) is the current
-bottleneck. Gradient updates initially degraded performance; a controlled
-sweep isolated the cause as step size rather than gradient direction.
+Phase 2 (controller refinement on a frozen morphology) is where the work is now.
+Early runs at `lr = 1e-3` *degraded* performance; a control run at `lr = 0`
+isolated the optimiser as the cause, and a sweep showed this to be a step-size
+problem rather than a gradient-direction problem.
 
 ![Learning rate sweep](lr-sweep.png)
 
-*Phase 2, 50 episodes, batch 2000. Higher learning rates rise faster and
-collapse earlier; 5e-5 is the only setting still improving at episode 50.
-The lr = 0 control separates the gradient's contribution from the
-exploration-noise annealing.*
+*50 episodes, batch 2000. Larger steps rise faster and collapse earlier; the
+lr = 0 control separates the gradient's contribution from the exploration-noise
+annealing.*
 
-At lr = 1e-4 the mean improves ~31% over 50 episodes, then plateaus for the
-following 100. Ongoing work: longer runs at 5e-5, a decaying learning-rate
-schedule, and whether the plateau reflects the optimiser or the limits of a
-frozen morphology.
+Extending the two best settings to 150 episodes reverses the ranking:
 
+![Long runs](long_run.png)
+
+*`lr = 1e-4` plateaus at ~150 from episode 50; `lr = 5e-5` climbs steadily to
+157 and is still improving at episode 150. The curves cross around episode 90 —
+a sweep truncated at 50 episodes would have picked the wrong setting.*
+
+Ongoing: running 5e-5 to convergence, testing a decaying schedule, and
+determining whether the eventual plateau reflects the optimiser or the limits of
+a frozen morphology. Full log in [EXPERIMENTS.md](EXPERIMENTS.md).
 ## ⚙️ Core Architecture & Physics
 
 The environment is designed to study Embodied AI and morphological evolution in fluid dynamics.
