@@ -8,11 +8,25 @@ Instead of relying on standard loops or pre-built engines, this project leverage
 
 ## 📊 Current Status
 
-The optimisation infrastructure is operational end-to-end: topology mutation, GPU-batched rollouts, and gradient flow through the simulator all work as intended.
+The optimisation infrastructure is operational end-to-end, and after fixing
+the actuation neutral point the creatures **do swim** — continuous body
+deformation producing net forward motion.
 
-**Learned behaviour has not yet converged to sustained swimming.** Current champions converge to a local optimum: a single large initial impulse followed by passive drift, which maximises early displacement reward without paying continued energy cost.
+Phase 2 (controller refinement on a frozen morphology) is the current
+bottleneck. Gradient updates initially degraded performance; a controlled
+sweep isolated the cause as step size rather than gradient direction.
 
-Ongoing work targets this failure mode — reward shaping (rewarding sustained velocity rather than cumulative displacement), exploration strategy, and the energy penalty schedule.
+![Learning rate sweep](lr-sweep.png)
+
+*Phase 2, 50 episodes, batch 2000. Higher learning rates rise faster and
+collapse earlier; 5e-5 is the only setting still improving at episode 50.
+The lr = 0 control separates the gradient's contribution from the
+exploration-noise annealing.*
+
+At lr = 1e-4 the mean improves ~31% over 50 episodes, then plateaus for the
+following 100. Ongoing work: longer runs at 5e-5, a decaying learning-rate
+schedule, and whether the plateau reflects the optimiser or the limits of a
+frozen morphology.
 
 ## ⚙️ Core Architecture & Physics
 
