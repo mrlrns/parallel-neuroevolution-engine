@@ -14,6 +14,7 @@ import torch.nn as nn
 import copy
 import os
 from torch.func import stack_module_state, functional_call, vmap
+import random
 
 from brain import Brain
 from megaVecto import MegaCrea
@@ -22,6 +23,10 @@ from megaVecto import MegaCrea
 # ⚙️ CONFIGURATION
 # ==========================================
 CHEMIN_CHAMPION = "elite_mutant/champion_gen_14_score_240.8_family_1.pt"  # <-- À MODIFIER
+
+SEED = 0
+random.seed(SEED)
+torch.manual_seed(SEED)
 
 BATCH_SIZE = 2000          # plus gros qu'en phase 1 : une seule créature, donc on peut se le permettre
 NB_EPISODES = 300        # le coeur de la phase 2 : beaucoup de pas d'apprentissage

@@ -147,6 +147,10 @@ def preparer_mega_univers(Population, device):
 
 if __name__ == '__main__':
 
+    SEED = 0
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+
     POP_SIZE = 50
     Population = [generer_topologie(i) for i in range(POP_SIZE)]
     os.makedirs("elite_mutant", exist_ok=True)
@@ -163,17 +167,11 @@ if __name__ == '__main__':
 
         frame_nb = 200
         nb_episodes = 30 if generation < 3 else 20
-        if generation < 15:
-            # Phase d'exploration : Énergie gratuite et on tolère les rebonds
-            coef_energie = 10000.0 
-            coef_hauteur = 0.0      # Aucune punition si elle rebondit
-        else:
-            # Phase d'optimisation : On punit la dépense et le mal de mer
-            coef_energie = 300.0 
-            coef_hauteur = 10.0
-        if generation == 15:
-          for c in Population:
-            c.best_score = float('-inf')
+        
+        # Phase d'exploration : Énergie gratuite et on tolère les rebonds
+        coef_energie = 10000.0 
+        coef_hauteur = 0.0      # Aucune punition si elle rebondit
+    
         # --- Création des POP_SIZE * BATCH_SIZE cerveaux ---
         brains_liste = []
         for creature in Population:

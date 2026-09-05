@@ -15,6 +15,7 @@ import os
 SUB_STEP = 10
 dt = torch.tensor(1.0 / SUB_STEP)
 device = torch.device("cpu")
+torch.manual_seed(0)
 
 pygame.init()
 ecran = pygame.display.set_mode((1200, 800), pygame.RESIZABLE)
