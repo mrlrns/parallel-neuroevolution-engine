@@ -21,13 +21,13 @@ from megaVecto import MegaCrea
 # ==========================================
 # ⚙️ CONFIGURATION
 # ==========================================
-CHEMIN_CHAMPION = "elite_mutant/champion_gen_14_score_105.8_family_12.pt"  # <-- À MODIFIER
+CHEMIN_CHAMPION = "elite_mutant/champion_gen_14_score_240.8_family_1.pt"  # <-- À MODIFIER
 
-BATCH_SIZE = 600          # plus gros qu'en phase 1 : une seule créature, donc on peut se le permettre
+BATCH_SIZE = 2000          # plus gros qu'en phase 1 : une seule créature, donc on peut se le permettre
 NB_EPISODES = 300        # le coeur de la phase 2 : beaucoup de pas d'apprentissage
 SUB_STEP = 10
 FRAME_NB = 300
-LEARNING_RATE = 0.001
+LEARNING_RATE = 5*1e-5
 
 COEF_ENERGIE = 3000.0
 COEF_HAUTEUR = 10.0

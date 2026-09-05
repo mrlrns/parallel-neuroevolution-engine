@@ -231,7 +231,7 @@ if __name__ == '__main__':
 
         brain_batch = vmap(fmodel, in_dims=(0, 0, 0))
         
-        optimizer = torch.optim.Adam(params.values(), lr=0.001)
+        optimizer = torch.optim.Adam(params.values(), lr=1e-4)
 
         for episode in range(nb_episodes):
             mega = MegaCrea(dico, BATCH_SIZE, device=device)
@@ -341,7 +341,7 @@ if __name__ == '__main__':
         new_population = list(survivants)
         for creature in survivants:
             child = creature.cloner()
-            child.mutate(rate_new_node=0.1, rate_mut_length=0.3, rate_change_bone=0.2)
+            child.mutate(rate_new_node=0.1, rate_mut_length=0.3, rate_change_bone=0.2,rate_pop_node=0.07)
             child.best_score = float('-inf')
             new_population.append(child)
         Population = new_population

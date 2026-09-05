@@ -123,8 +123,7 @@ with torch.no_grad():
         if frame % 5 == 0:
             obs = champion.get_observation(frame)          # [1, 1, obs_size]
             obs_flat = obs.reshape(1, obs_size)             # aplati pour le forward classique
-            action = cerveau(obs_flat)  
-            print (action.mean())                    # [1, action_size]
+            action = cerveau(obs_flat)                     # [1, action_size]
             action = action.reshape(1, 1, action_size)       # reforme pour apply_action
             champion.apply_action(action,frame)
 
