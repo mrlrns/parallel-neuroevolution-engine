@@ -7,7 +7,7 @@ Negative results are kept — they are the ones that constrain the search.
 
 ## E0 — Baseline: reward telescoping produces a degenerate policy
 
-**Date:** [à compléter]
+2026/06
 
 **Observation.** Champions maximised score without producing sustained swimming:
 a single initial impulse followed by passive drift.
@@ -34,7 +34,7 @@ of zero still commanded a 15% contraction — a free initial impulse, since the 
 
 ## E1 — Fix the neutral point and the energy metric
 
-**Date:** [à compléter]
+2026/08/05
 
 **Changes.**
 - `new_lengths = base − 0.3 · base · action` (neutral point back at natural length)
@@ -61,7 +61,7 @@ honest metric — and it goes the wrong way.
 
 ## E2 — Phase 2 refinement degrades the policy
 
-**Date:** [à compléter]
+2026/08/10
 **Setup.** `train2.py`, champion gen 14, `BATCH_SIZE = 600`, `FRAME_NB = 300`,
 truncated BPTT every 60 frames, Adam `lr = 1e-3`, exploration noise annealed 0.030 → 0.020.
 
@@ -82,7 +82,7 @@ stays flat around 380–410: the distribution spreads rather than shifts. Explor
 
 ## E3 — Control: is the optimiser the cause?
 
-**Date:** [à compléter]
+2026/08/12
 **Setup.** Identical to E2 with `LEARNING_RATE = 0`. Nothing else changed.
 
 | episode | mean | mean distance |
@@ -165,7 +165,7 @@ run variance is real and single runs should not be over-interpreted.
 2. A decaying schedule (1e-4 → 2e-5) should capture the fast early rise of 1e-4
    while avoiding the stall, given the peak-then-decline pattern from E4.
 
-**Result.** [à compléter]
+
 
 ## Open questions
 
