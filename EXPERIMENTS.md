@@ -165,7 +165,59 @@ run variance is real and single runs should not be over-interpreted.
 2. A decaying schedule (1e-4 → 2e-5) should capture the fast early rise of 1e-4
    while avoiding the stall, given the peak-then-decline pattern from E4.
 
+---
 
+## E7 — Phase 1 control: does the gradient contribute anything?
+
+**Date:** 2026/09/06
+
+**Setup.** `train.py`, 18 generations, POP_SIZE = 50, BATCH_SIZE = 30, `SEED = 0`.
+Curriculum removed since E6 (`coef_energie = 10000`, `coef_hauteur = 0` throughout):
+energy refinement now belongs to phase 2, and a mid-run objective switch made
+scores incomparable across generations. Two runs, `lr = 1e-4` and `lr = 0`,
+identical in every other respect.
+
+**Seeding validates the pairing.** Both runs report 22.30 max / 0.28 mean at
+generation 0, episode 0 — identical to the decimal, as expected before any
+gradient step is applied. The curves separate from episode 5 onward. `lr` is the
+only variable.
+
+| generation | lr = 1e-4 | lr = 0 |
+|---|---|---|
+| 0 | 0.68 | 0.28 |
+| 3 | 9.20 | 9.05 |
+| 6 | 19.63 | 17.15 |
+| 9 | 26.93 | 12.46 |
+| 12 | 34.06 | 15.40 |
+| 14 | 33.61 | 15.24 |
+| 15 | 35.60 | 15.36 |
+
+**Result.** The gradient run reaches **+121%** over control at generation 14 and
+stabilises around 36. The control plateaus near 15 from generation 8 and
+**regresses** between generations 6 and 9 (17.15 → 12.46).
+
+**Conclusion.** Contrary to what the intra/inter-generation decomposition
+suggested, phase 1 gradient learning carries most of the gain. The mechanism is
+indirect: at `lr = 0` all 30 brains of a creature stay strictly identical (they
+are loaded from the same `creature.brain_weights` and nothing perturbs them), so
+end-of-generation selection has no diversity to select from. The gradient
+*produces* the variation; selection only *banks* it at the generation boundary.
+This is why the gain appears as jumps between generations while within-generation
+progress looks small — the two are not separable.
+
+**Secondary finding.** Under `lr = 0`, morphological mutation alone *degrades*
+performance across generations 6–9. Topology search without a controller able to
+adapt to the new topology is not merely useless, it is harmful. Direct argument
+for co-optimisation rather than staged search.
+
+**Side note.** Removing the curriculum leaves no visible discontinuity:
+generations 14 → 15 → 16 read 33.61 → 35.60 → 36.14. The former switch at
+generation 15 is confirmed to have been inert (E6 measured −1.2% for a ×33 change
+in energy pressure).
+
+**Caveat.** Single run per setting. E5 established that run-to-run variance is
+real; a ×2.2 gap is far outside plausible noise, but the exact plateau values are
+not to be over-interpreted.
 
 ## Open questions
 
