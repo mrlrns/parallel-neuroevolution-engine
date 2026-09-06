@@ -147,6 +147,13 @@ def preparer_mega_univers(Population, device):
 
 if __name__ == '__main__':
 
+    lr=1e-4
+
+    rate_new_node=0.1
+    rate_mut_length=0.3
+    rate_change_bone=0.2
+    rate_pop_node=0.15
+
     SEED = 0
     random.seed(SEED)
     torch.manual_seed(SEED)
@@ -154,6 +161,8 @@ if __name__ == '__main__':
     POP_SIZE = 50
     Population = [generer_topologie(i) for i in range(POP_SIZE)]
     os.makedirs("elite_mutant", exist_ok=True)
+
+    print(f" Lancement entrainement lr:{lr} rate_new_node :{rate_new_node} rate_mut_length:{rate_mut_length} rate_change_bone :{rate_change_bone} rate_pop_node :{rate_pop_node}")
 
     for generation in range(30):
         print(f"\n🚀 GÉNÉRATION {generation}")
@@ -229,7 +238,7 @@ if __name__ == '__main__':
 
         brain_batch = vmap(fmodel, in_dims=(0, 0, 0))
         
-        optimizer = torch.optim.Adam(params.values(), lr=1e-4)
+        optimizer = torch.optim.Adam(params.values(), lr=lr)
 
         for episode in range(nb_episodes):
             mega = MegaCrea(dico, BATCH_SIZE, device=device)
@@ -314,7 +323,10 @@ if __name__ == '__main__':
         # --- Fin de génération : tri, sauvegarde, mutation ---
         Population.sort(key=lambda c: c.score_generation, reverse=True)
         champion = Population[0]
-        print(f"✅ FIN GÉNÉRATION {generation} — 🏆 Champion score: {champion.best_score:.2f} (famille {champion.family})")
+        taille_moy = sum(len(c.x) for c in Population) / len(Population)
+        print(f"✅ FIN GÉNÉRATION {generation} — 🏆 Champion score: {champion.best_score:.2f} "
+              f"({len(champion.x)} noeuds, {len(champion.muscle1)} liens) | "
+              f"taille moyenne pop: {taille_moy:.1f} | famille {champion.family}")
 
         x_base = torch.tensor(champion.x, dtype=torch.float32)
         y_base = torch.tensor(champion.y, dtype=torch.float32)
@@ -339,7 +351,7 @@ if __name__ == '__main__':
         new_population = list(survivants)
         for creature in survivants:
             child = creature.cloner()
-            child.mutate(rate_new_node=0.1, rate_mut_length=0.3, rate_change_bone=0.2,rate_pop_node=0.07)
+            child.mutate(rate_new_node, rate_mut_length, rate_change_bone,rate_pop_node)
             child.best_score = float('-inf')
             new_population.append(child)
         Population = new_population
