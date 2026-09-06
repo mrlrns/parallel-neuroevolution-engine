@@ -34,7 +34,7 @@ ROUGE_MUSCLE = (200, 50, 50)
 
 # Champion issu de train.py     -> elite_mutant/
 # Champion raffiné par train2.py -> champion_raffine/
-chemin_fichier = "champion_raffine/raffine_ep100_score_427.9.pt"
+chemin_fichier = "elite_mutant/champion_gen_9_score_139.2_family_6.pt"
 
 donnees = torch.load(chemin_fichier, map_location=device)
 

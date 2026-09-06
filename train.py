@@ -290,10 +290,7 @@ if __name__ == '__main__':
 
             loss = -torch.sum(rewards_accumulated) / (POP_SIZE * BATCH_SIZE)
 
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(params.values(), max_norm=1.0)
-            optimizer.step()
+            
 
             # --- Sélection du champion pour CHAQUE créature de la population ---
             params_reshaped = {
@@ -314,6 +311,10 @@ if __name__ == '__main__':
                     creature.brain_weights = {
                         k: v[p, best_idx].detach().clone() for k, v in params_reshaped.items()
                     }
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(params.values(), max_norm=1.0)
+            optimizer.step()
 
             if episode % 5 == 0:
                 meilleur = max(c.best_score for c in Population)
