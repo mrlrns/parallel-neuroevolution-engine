@@ -67,7 +67,7 @@ Two nested processes run together:
 - **Evolutionary search over morphology** — node insertion, link retyping (bone ↔ muscle) and length perturbation, all constrained to preserve bilateral symmetry. Elitist selection keeps the top half of the population each generation.
 - **Gradient-based controller learning** — rewards are backpropagated *through* the differentiable physics simulator. Training uses truncated BPTT, gradient-norm clipping, and automatic detection and recovery from numerical divergence.
 
-The reward follows a curriculum: early generations optimise displacement with free energy, later generations introduce energy and vertical-oscillation penalties.
+Phase 1 optimises displacement alone; energy and vertical-oscillation penalties are applied in phase 2, on a frozen morphology.
 
 ## 📁 Repository Structure
 
