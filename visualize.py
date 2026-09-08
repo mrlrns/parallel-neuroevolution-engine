@@ -15,7 +15,7 @@ import os
 SUB_STEP = 10
 dt = torch.tensor(1.0 / SUB_STEP)
 device = torch.device("cpu")
-torch.manual_seed(0)
+
 
 pygame.init()
 ecran = pygame.display.set_mode((1200, 800), pygame.RESIZABLE)
@@ -34,7 +34,7 @@ ROUGE_MUSCLE = (200, 50, 50)
 
 # Champion issu de train.py     -> elite_mutant/
 # Champion raffiné par train2.py -> champion_raffine/
-chemin_fichier = "elite_mutant/champion_gen_9_score_139.2_family_6.pt"
+chemin_fichier = "elite_mutant/raffine_ep250_score_222.9.pt"
 
 donnees = torch.load(chemin_fichier, map_location=device)
 
@@ -79,8 +79,11 @@ dico = {
     "masque_noeuds": masque_noeuds, "masque_muscles": masque_muscles
 }
 
+torch.manual_seed(5)
 champion = MegaCrea(dico, batch_size=1, device=device)
-
+print("X init:", champion.X[0, 0, :num_nodes_reel].tolist())
+print("X_base:", x)
+depart = champion.X[0, 0, :num_nodes_reel].mean().item()
 # --- Reconstruction du cerveau avec les BONNES dimensions (celles de l'entraînement) ---
 obs_size = max_noeuds * 4 + max_muscles + 1
 action_size = max_muscles
@@ -95,7 +98,7 @@ chemin_video = f"videos_ia_(5FRAMES)/episode_15FRAMES2.mp4"
 video_writer = cv2.VideoWriter(chemin_video, fourcc, 60.0, (largeur, hauteur))
 
 with torch.no_grad():
-    for frame in range(1000):
+    for frame in range(300):
 
         touches = pygame.key.get_pressed()
         for event in pygame.event.get():
@@ -125,7 +128,8 @@ with torch.no_grad():
             obs = champion.get_observation(frame)          # [1, 1, obs_size]
             obs_flat = obs.reshape(1, obs_size)             # aplati pour le forward classique
             action = cerveau(obs_flat)                     # [1, action_size]
-            action = action.reshape(1, 1, action_size)       # reforme pour apply_action
+            action = action.reshape(1, 1, action_size)
+            action = action + torch.randn_like(action) * 0.02       # reforme pour apply_action
             champion.apply_action(action,frame)
 
         for _ in range(SUB_STEP):
@@ -164,4 +168,5 @@ with torch.no_grad():
         video_writer.write(image_bgr)
 
 video_writer.release()
+print("déplacement:", champion.X[0, 0, :num_nodes_reel].mean().item() - depart)
 print("🎬 Vidéo de démonstration sauvegardée avec succès !")

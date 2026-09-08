@@ -34,7 +34,7 @@ class MegaCrea:
         self.masses = torch.ones_like(self.X)
         
         self.energy = torch.zeros((self.X.shape[0], batch_size), device=device)
-        self.total_energy = torch.zeros((self.X.shape[0], batch_size), device=device)
+       
         
         nb_nodes = torch.clamp(torch.sum(self.mask_N_exp, dim=2), min=1.0)
         self.previous_distance = torch.sum(self.X * self.mask_N_exp, dim=2) / nb_nodes
@@ -42,7 +42,7 @@ class MegaCrea:
         
         
         
-        self.previous_vitesse = torch.zeros_like(self.previous_distance)
+        
 
     def apply_physics(self, dt):
         
@@ -195,7 +195,7 @@ class MegaCrea:
         # L'énergie accumulée sur la dimension 2 (les muscles) pour obtenir [POP, BATCH]
         energy_step = torch.sum(torch.abs(new_lengths-base ) * self.mask_vrais_M_exp, dim=2)
         self.energy = self.energy + energy_step
-        self.total_energy = self.total_energy + energy_step
+        
 
     def get_reward(self, coeff_energie, coeff_hauteur):
       nb_nodes = torch.clamp(torch.sum(self.mask_N_exp, dim=2), min=1.0)

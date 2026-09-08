@@ -22,7 +22,7 @@ from megaVecto import MegaCrea
 # ==========================================
 # ⚙️ CONFIGURATION
 # ==========================================
-CHEMIN_CHAMPION = "elite_mutant/champion_gen_14_score_240.8_family_1.pt"  # <-- À MODIFIER
+CHEMIN_CHAMPION = "elite_mutant/champion_gen_28_score_222.8_family_14.pt"  # <-- À MODIFIER
 
 SEED = 0
 random.seed(SEED)
@@ -34,8 +34,8 @@ SUB_STEP = 10
 FRAME_NB = 300
 LEARNING_RATE = 5*1e-5
 
-COEF_ENERGIE = 3000.0
-COEF_HAUTEUR = 10.0
+COEF_ENERGIE = 10000.0
+COEF_HAUTEUR = 0.0
 
 SAUVEGARDE_TOUS_LES = 25  # sauvegarde un checkpoint tous les N épisodes
 
@@ -95,36 +95,14 @@ dico = {
 obs_size = max_noeuds * 4 + max_muscles + 1
 action_size = max_muscles
 
+#We only build one brain that will be updated with all the gradients 
 
-# ==========================================
-# 🧠 CRÉATION DU BATCH DE CERVEAUX
-# ==========================================
-# Tous initialisés avec les poids du champion, puis légèrement perturbés
-# pour créer de la diversité dans le batch (sinon les 200 sont identiques).
-brains_liste = []
-for i in range(BATCH_SIZE):
-    b = Brain(obs_size, action_size).to(device)
-    if donnees['brain_weights'] is not None:
-        b.load_state_dict(donnees['brain_weights'])
-        if i > 0:  # on garde le premier strictement identique au champion
-            with torch.no_grad():
-                for p in b.parameters():
-                    p.add_(torch.randn_like(p) * 0.01)
-    brains_liste.append(b)
-
-params, buffers = stack_module_state(brains_liste)
-params = {k: nn.Parameter(v) for k, v in params.items()}
-brain_architecture = copy.deepcopy(brains_liste[0]).to(device)
-
-
-def fmodel(parametres, tampons, observation):
-    return functional_call(brain_architecture, (parametres, tampons), (observation,))
-
-
-brain_batch = vmap(fmodel, in_dims=(0, 0, 0))
+cerveau = Brain(obs_size, action_size).to(device)
+if donnees['brain_weights'] is not None:
+    cerveau.load_state_dict(donnees['brain_weights'])
 
 # ⚡️ L'OPTIMISEUR EST CRÉÉ UNE SEULE FOIS, HORS DE TOUTE BOUCLE
-optimizer = torch.optim.Adam(params.values(), lr=LEARNING_RATE)
+optimizer = torch.optim.Adam(cerveau.parameters(), lr=LEARNING_RATE)
 
 os.makedirs("champion_raffine", exist_ok=True)
 
@@ -150,10 +128,7 @@ for episode in range(NB_EPISODES):
     for frame in range(FRAME_NB):
         if frame % 5 == 0:
             obs = mega.get_observation(frame)                    # [1, BATCH, obs_size]
-            obs_flat = obs.reshape(BATCH_SIZE, obs_size)
-
-            action_flat = brain_batch(params, buffers, obs_flat)
-            action = action_flat.reshape(1, BATCH_SIZE, action_size)
+            action = cerveau(obs)                                # [1, BATCH, action_size]
 
             bruit = torch.randn_like(action) * bruit_scale
             mega.apply_action(action + bruit, frame)
@@ -162,7 +137,7 @@ for episode in range(NB_EPISODES):
             rewards_accumulated = reward_step if rewards_accumulated is None else rewards_accumulated + reward_step
 
         # Troncature du gradient : évite une chaîne de backprop de 3000 pas
-        if frame % 60 == 0 and frame > 0:
+        if frame % 10 == 0 and frame > 0:
             mega.X = mega.X.detach()
             mega.Y = mega.Y.detach()
             mega.vX = mega.vX.detach()
@@ -189,24 +164,24 @@ for episode in range(NB_EPISODES):
 
     optimizer.zero_grad()
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(params.values(), max_norm=1.0)
+    norm=torch.nn.utils.clip_grad_norm_(cerveau.parameters(), max_norm=10.0)
     optimizer.step()
 
     # --- Suivi et sauvegarde du meilleur ---
     scores = rewards_accumulated[0]                      # [BATCH]
-    best_idx = torch.argmax(scores).item()
-    best_score = scores[best_idx].item()
+    score_moyen = scores.mean().item()
 
-    if best_score > meilleur_score_global:
-        meilleur_score_global = best_score
-        meilleurs_poids = {k: v[best_idx].detach().clone() for k, v in params.items()}
+    if score_moyen > meilleur_score_global:
+        meilleur_score_global = score_moyen
+        meilleurs_poids = {k: v.detach().clone()
+                           for k, v in cerveau.state_dict().items()}
 
     if episode % 10 == 0:
         nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
         pos_fin = torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n
         distance_finale = (pos_fin - pos_depart).mean().item()
-        print(f"Ép. {episode:4d} | score max: {best_score:8.2f} | "
-              f"moyenne: {scores.mean().item():8.2f} | "
+        print(f"Ép. {episode:4d} | moyenne: {score_moyen:8.2f} | "
+              f"écart-type: {scores.std().item():8.2f} | norme gradient {norm}  | "
               f"distance moy: {distance_finale:7.2f} | bruit: {bruit_scale:.4f}")
 
     if episode % SAUVEGARDE_TOUS_LES == 0 and meilleurs_poids is not None:

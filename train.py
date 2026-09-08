@@ -147,7 +147,7 @@ def preparer_mega_univers(Population, device):
 
 if __name__ == '__main__':
 
-    lr=1e-4
+    lr=1e-3
 
     rate_new_node=0.1
     rate_mut_length=0.3
@@ -223,11 +223,11 @@ if __name__ == '__main__':
                     creature.brain_weights = new_w
             # --------------------------------
 
-            for _ in range(BATCH_SIZE):
-                b = Brain(obs_size, action_size).to(device)
-                if creature.brain_weights is not None:
-                    b.load_state_dict(creature.brain_weights)
-                brains_liste.append(b)
+            
+            b = Brain(obs_size, action_size).to(device)
+            if creature.brain_weights is not None:
+                b.load_state_dict(creature.brain_weights)
+            brains_liste.append(b)
 
         params, buffers = stack_module_state(brains_liste)
         params = {k: nn.Parameter(v) for k, v in params.items()}
@@ -249,10 +249,10 @@ if __name__ == '__main__':
             for frame in range(frame_nb):
                 if frame % 5 == 0:
                     obs = mega.get_observation(frame)  # [POP, BATCH, obs_size]
-                    obs_flat = obs.reshape(POP_SIZE * BATCH_SIZE, obs_size)
+                    
 
-                    action_flat = brain_batch(params, buffers, obs_flat)
-                    action = action_flat.reshape(POP_SIZE, BATCH_SIZE, action_size)
+                    action = brain_batch(params, buffers, obs)
+                    
 
                     bruit = torch.randn_like(action) * 0.02
                     mega.apply_action(action + bruit,frame)
@@ -269,7 +269,7 @@ if __name__ == '__main__':
                         explosion = True
                         break
 
-                if frame % 20 == 0 and frame > 0:
+                if frame % 10 == 0 and frame > 0:
                     mega.X = mega.X.detach()
                     mega.Y = mega.Y.detach()
                     mega.vX = mega.vX.detach()
@@ -292,40 +292,31 @@ if __name__ == '__main__':
 
             
 
-            # --- Sélection du champion pour CHAQUE créature de la population ---
-            params_reshaped = {
-                k: v.reshape(POP_SIZE, BATCH_SIZE, *v.shape[1:]) for k, v in params.items()
-            }
-
+                        # --- Suivi de la performance moyenne de chaque créature ---
             for p, creature in enumerate(Population):
-                scores_creature = rewards_accumulated[p]
-                best_idx = torch.argmax(scores_creature).item()
-                best_score = scores_creature[best_idx].item()
+                score_moyen = rewards_accumulated[p].mean().item()
+                if score_moyen > creature.score_generation:
+                    creature.score_generation = score_moyen
 
-                # Suivi de la performance de CETTE génération (pour le tri)
-                if best_score > creature.score_generation:
-                    creature.score_generation = best_score
 
-                if best_score > creature.best_score:
-                    creature.best_score = best_score
-                    creature.brain_weights = {
-                        k: v[p, best_idx].detach().clone() for k, v in params_reshaped.items()
-                    }
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(params.values(), max_norm=1.0)
+            norm=torch.nn.utils.clip_grad_norm_(params.values(), max_norm=10.0)
             optimizer.step()
 
             if episode % 5 == 0:
-                meilleur = max(c.best_score for c in Population)
+                meilleur = max(c.score_generation for c in Population)
                 moyenne_episode = torch.mean(rewards_accumulated).item() 
-                print(f"  Épisode {episode} — meilleur score population: {meilleur:.2f} | moyenne CET épisode: {moyenne_episode:.2f}")
+                print(f"  Épisode {episode} — meilleur score population: {meilleur:.2f} | moyenne CET épisode: {moyenne_episode:.2f} | norme gradient {norm}")
+        # --- Les poids finaux de la génération deviennent l'héritage ---
+        for p, creature in enumerate(Population):
+            creature.brain_weights = {k: v[p].detach().clone() for k, v in params.items()}
 
         # --- Fin de génération : tri, sauvegarde, mutation ---
         Population.sort(key=lambda c: c.score_generation, reverse=True)
         champion = Population[0]
         taille_moy = sum(len(c.x) for c in Population) / len(Population)
-        print(f"✅ FIN GÉNÉRATION {generation} — 🏆 Champion score: {champion.best_score:.2f} "
+        print(f"✅ FIN GÉNÉRATION {generation} — 🏆 Champion score: {champion.score_generation:.2f} "
               f"({len(champion.x)} noeuds, {len(champion.muscle1)} liens) | "
               f"taille moyenne pop: {taille_moy:.1f} | famille {champion.family}")
 
@@ -338,7 +329,7 @@ if __name__ == '__main__':
 
         adn_texte = str(champion.x) + str(champion.y) + str(champion.is_bone)
         empreinte = hashlib.md5(adn_texte.encode()).hexdigest()[:6]
-        nom_fichier = f"champion_gen_{generation}_score_{champion.best_score:.1f}_family_{champion.family}.pt"
+        nom_fichier = f"champion_gen_{generation}_score_{champion.score_generation:.1f}_family_{champion.family}.pt"
 
         torch.save({
             'x': champion.x, 'y': champion.y, 'is_bone': champion.is_bone,
@@ -353,6 +344,6 @@ if __name__ == '__main__':
         for creature in survivants:
             child = creature.cloner()
             child.mutate(rate_new_node, rate_mut_length, rate_change_bone,rate_pop_node)
-            child.best_score = float('-inf')
+            child.score_generation = float('-inf')
             new_population.append(child)
         Population = new_population
