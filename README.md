@@ -4,36 +4,50 @@
 
 This repository implements a custom, fully vectorized 2D physics engine built from scratch in PyTorch to simulate soft-body aquatic creatures.
 
-Instead of relying on standard loops or pre-built engines, this project leverages `torch.func.vmap` to achieve **massively parallel neural network evaluations**. By vectorizing both the physics simulation and the Brain (Multi-Layer Perceptron), the engine trains batches of 1,500 creatures simultaneously directly on the GPU, eliminating CPU-GPU transfer bottlenecks.
+Instead of relying on standard loops or pre-built engines, this project leverages `torch.func.vmap` to achieve **massively parallel neural network evaluations**. By vectorizing both the physics simulation and the Brain (Multi-Layer Perceptron), the engine evaluates 50 morphologies × 30 concurrent rollouts in a single batched pass.
 
 ## 📊 Current Status
 
-The optimisation infrastructure is operational end-to-end, and after fixing the
-actuation neutral point the creatures **do swim** — continuous body deformation
-producing net forward motion.
+The creatures swim. The best refined controller travels ~615 units over 1000
+frames from a 9-node, 12-link body, and its training score is now reproducible on
+replay to within 1%.
 
-Phase 2 (controller refinement on a frozen morphology) is where the work is now.
-Early runs at `lr = 1e-3` *degraded* performance; a control run at `lr = 0`
-isolated the optimiser as the cause, and a sweep showed this to be a step-size
-problem rather than a gradient-direction problem.
+Remaining limitation: the reward telescopes to net displacement, so nothing yet
+requires sustained motion — behaviour degrades beyond the 300-frame training
+horizon. Next step is a reward on maintained velocity.
+
+## 🔬 How we got there
+
+Three compounding bugs had to be found first. Full log in
+[EXPERIMENTS.md](EXPERIMENTS.md).
+
+**Champion weights were saved after the optimiser step**, so every archived
+champion was a post-update, degraded version of the policy that had earned the
+score — a 34% reproduction gap.
+
+**Selection used `argmax` over a single rollout**, rewarding a favourable initial
+condition as much as a better policy. Replaced by one brain per morphology
+trained on the mean gradient of 30 concurrent rollouts.
+
+**Gradients through the stiff mass-spring simulator reached 1.3 × 10⁸** with a
+60-frame BPTT window, so `clip_grad_norm_(1.0)` was normalising away all
+magnitude information. Shortening the window to 10 frames brought the norm to
+~870 and unblocked learning.
+
+Before those fixes, a learning-rate sweep had already established that the
+gradient direction was sound and the step size was the binding constraint:
 
 ![Learning rate sweep](lr-sweep.png)
 
 *50 episodes, batch 2000. Larger steps rise faster and collapse earlier; the
-lr = 0 control separates the gradient's contribution from the exploration-noise
+lr = 0 control separates the gradient's contribution from exploration-noise
 annealing.*
-
-Extending the two best settings to 150 episodes reverses the ranking:
 
 ![Long runs](long_run.png)
 
-*`lr = 1e-4` plateaus at ~150 from episode 50; `lr = 5e-5` climbs steadily to
-157 and is still improving at episode 150. The curves cross around episode 90 —
-a sweep truncated at 50 episodes would have picked the wrong setting.*
+*Extending the two best settings to 150 episodes reverses the ranking — a sweep
+truncated at 50 episodes would have picked the wrong one.*
 
-Ongoing: running 5e-5 to convergence, testing a decaying schedule, and
-determining whether the eventual plateau reflects the optimiser or the limits of
-a frozen morphology. Full log in [EXPERIMENTS.md](EXPERIMENTS.md).
 ## ⚙️ Core Architecture & Physics
 
 The environment is designed to study Embodied AI and morphological evolution in fluid dynamics.
@@ -42,7 +56,7 @@ The environment is designed to study Embodied AI and morphological evolution in 
 
 Creatures are dynamically generated as graphs of nodes (masses) and edges (muscles/bones). The physical interactions are resolved using matrix operations for high-throughput batch processing.
 
-Because evolved morphologies differ in node and edge count, every creature is padded to a common size and masked, so a heterogeneous population still fits in a single dense tensor. Controller input and output layers are resized on the fly when a mutation changes a creature's topology, preserving previously learned weights.
+Because evolved morphologies differ in node and edge count, every creature is padded to a common size and masked, so a heterogeneous population fits in a single dense tensor. That size is currently derived from the largest creature in the population, which means one creature growing shifts the blocks of the observation vector for every controller — a suspected cause of the abrupt performance drops observed at generations 14 and 23. Fixing these dimensions for the whole run is the planned correction.
 
 ### 2. Hydrodynamic Drag Simulation
 
@@ -90,7 +104,7 @@ Phase 1 optimises displacement alone; energy and vertical-oscillation penalties 
 
 ### Running the Training
 
-**Phase 1** — evolutionary search across 50 morphologies × 30 controller variants (1,500 concurrent simulations):
+**Phase 1** — evolutionary search across 50 morphologies × 30 controller variants :
 
 ```bash
 python train.py

@@ -158,12 +158,28 @@ run variance is real and single runs should not be over-interpreted.
 
 ---
 
-## E6 — Planned: 5e-5 to convergence, and a decaying schedule
+## E6 — The saved champion is not the champion that scored
 
-**Hypotheses.**
-1. `lr = 5e-5` has not yet plateaued at 150 episodes. Run to 300 to locate it.
-2. A decaying schedule (1e-4 → 2e-5) should capture the fast early rise of 1e-4
-   while avoiding the stall, given the peak-then-decline pattern from E4.
+**Symptom.** Champions were not reproducible: `champion_gen_9` was saved with a
+score of 139.2, but replaying it under identical training conditions (batch 30,
+200 frames, 600 samples) never exceeded 92, with a mean of 62.
+
+**Hypotheses tested and eliminated.**
+- Extreme-value statistics alone — ruled out: 600 replay samples should have
+  recovered 139 if it were reachable.
+- Exploration noise missing at replay — ruled out: adding it changed nothing.
+- Stale weights inherited across a topology mutation — ruled out: the log shows
+  the record was set *during* generation 9.
+
+**Cause.** Champion weights were extracted from `params` **after**
+`optimizer.step()`, while the score had been obtained with the pre-update
+weights. At `lr = 1e-3` a single gradient step was enough to destroy a good
+policy, so every archived champion was a degraded version of itself.
+
+**Fix.** Move champion selection and weight extraction before `optimizer.step()`.
+
+**Verification.** A champion saved after the fix scores **157.9** in training and
+**156.8** on replay — a 0.7% gap, against 34% before.
 
 ---
 
@@ -219,6 +235,62 @@ in energy pressure).
 real; a ×2.2 gap is far outside plausible noise, but the exact plateau values are
 not to be over-interpreted.
 
+---
+
+## E8 — Selection on a single rollout optimises luck, not skill
+
+**Symptom.** Even after E6, replayed champions varied wildly with the initial
+condition: the same policy and seed range produced 206, 97 and 24 units of
+displacement across three replay configurations.
+
+**Cause.** Each morphology carried 30 brains that diverged under their own
+gradients, and `argmax` picked the best *single* rollout. Since each variant also
+faced a different initial perturbation, the selection rewarded a favourable
+starting state as much as a better policy.
+
+**Fix.** One brain per morphology, evaluated on 30 concurrent rollouts. The loss
+being a sum, each brain receives the **mean gradient** of its rollouts, so the
+optimised quantity is expected performance rather than a best case. Selection by
+`argmax` is removed entirely; the generation's final weights are inherited.
+
+**Result.** Champion 222.8 at generation 28. Champion-to-population-mean ratio
+drops from 4:1 to 1.8:1. Replay gives a mean of 163 over 20×30 samples with a
+spread of 157–172 — stable.
+
+---
+
+## E9 — Gradients explode through the stiff simulator
+
+**Symptom.** After E7 the phase-2 mean stagnated (124 → 116 → 121 → 122 over 30
+episodes) regardless of learning rate.
+
+**Measurement.** Logging the pre-clip gradient norm gave **1.3 × 10⁸** with BPTT
+truncation every 60 frames (600 compounded physics steps). `clip_grad_norm_(1.0)`
+was dividing by a hundred million and preserving only a direction dominated by
+whichever components had blown up.
+
+**Fix.** Truncate every 10 frames instead of 60, raise `max_norm` to 10.
+
+| truncation window | gradient norm |
+|---|---|
+| 60 frames | 1.3 × 10⁸ |
+| 10 frames | ~870 |
+
+**Result.** Phase 2 on champion gen 28, 250 episodes, lr = 5e-5, batch 500:
+**124.8 → 222.0**, +78%, near-monotonic. Relative spread improves from 22% to
+16% of the mean. The gradient norm itself settles to 17–200 as the policy
+improves — a better policy produces better-conditioned dynamics.
+
+Peaks of 400–1400 persist and are absorbed by the clip. This residual
+ill-conditioning is the concrete argument for the short-horizon-plus-critic
+approach of Xu et al.
+
+**Behavioural outcome.** The refined champion travels 615 units over 1000 frames
+(911 on the best seed), against 63 for the broken champion of E6, and no longer
+locks onto a fixed point within its 300-frame training horizon. Beyond 300 frames
+the behaviour degrades — expected, since that is the edge of the training
+distribution.
+
 ## Open questions
 
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to
@@ -231,9 +303,16 @@ not to be over-interpreted.
 - Adam is re-instantiated at every generation in `train.py`, so its moment estimates reset
   roughly every 20 episodes. Unavoidable in part (parameter shapes change under mutation),
   but it means phase 1 never runs a warm optimiser.
-- Mutation operators are asymmetric: `rate_new_node = 0.1` adds nodes, nothing
-  ever removes them. Structural bloat. Needs a mirrored-pair deletion operator
-  with a connectivity guard and index remapping, and/or a parsimony penalty.
+- Mutation operators were asymmetric (nothing removed nodes). A mirrored-pair
+  deletion operator with connectivity check and index remapping now keeps mean
+  population size stable at ~9 nodes over 30 generations.
+- `MAX_NOEUDS` / `MAX_MUSCLES` are dictated by the largest creature in the
+  population, so one creature growing resizes every network — the observation
+  vector's blocks shift and previously learned weights read the wrong inputs.
+  Suspected cause of the abrupt drops at generations 14 and 23. Fix: fix these
+  dimensions for the whole run.
+- The reward still telescopes to net displacement, so nothing requires sustained
+  motion. Next experiment: reward maintained velocity instead.
 
 ## Related work to read
 
