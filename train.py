@@ -20,6 +20,8 @@ print(f"Device utilisé : {device}")
 
 SUB_STEP = 10
 BATCH_SIZE = 30
+MAX_NOEUDS_FIXE = 20
+MAX_MUSCLES_FIXE = 30
 dt = torch.tensor(1.0 / SUB_STEP, device=device)
 
 
@@ -96,7 +98,7 @@ def generer_topologie(i):
     return Individu(x, y, muscle1l, muscle2l, is_bone, i)
 
 
-def preparer_mega_univers(Population, device):
+def preparer_mega_univers(Population, device,max_n, max_m):
     liste_X, liste_Y = [], []
     liste_m1, liste_m2 = [], []
     liste_stiff, liste_is_bone, liste_base_length = [], [], []
@@ -130,12 +132,32 @@ def preparer_mega_univers(Population, device):
     Mega_is_bone = pad_sequence(liste_is_bone, batch_first=True, padding_value=0.0).to(device)
     Mega_base_length = pad_sequence(liste_base_length, batch_first=True, padding_value=0.0).to(device)
 
+    assert Mega_X.shape[1] <= max_n, f"créature à {Mega_X.shape[1]} nœuds, max fixé à {max_n}"
+    assert Mega_m1.shape[1] <= max_m, f"créature à {Mega_m1.shape[1]} liens, max fixé à {max_m}"
+
+    def completer(t, taille, pad_value=0.0):
+        manque = taille - t.shape[1]
+        if manque > 0:
+            bourrage = torch.full((t.shape[0], manque), pad_value,
+                                  dtype=t.dtype, device=t.device)
+            t = torch.cat([t, bourrage], dim=1)
+        return t
+
+    Mega_X = completer(Mega_X, max_n)
+    Mega_Y = completer(Mega_Y, max_n)
+    Mega_m1 = completer(Mega_m1, max_m, 0)
+    Mega_m2 = completer(Mega_m2, max_m, 0)
+    Mega_stiff = completer(Mega_stiff, max_m)
+    Mega_is_bone = completer(Mega_is_bone, max_m)
+    Mega_base_length = completer(Mega_base_length, max_m)
+
+
     tailles_noeuds_t = torch.tensor(tailles_noeuds, device=device)
-    max_noeuds = Mega_X.shape[1]
+    max_noeuds = max_n
     Masque_Noeuds = (torch.arange(max_noeuds, device=device) < tailles_noeuds_t.unsqueeze(1)).float()
 
     tailles_muscles_t = torch.tensor(tailles_muscles, device=device)
-    max_muscles = Mega_m1.shape[1]
+    max_muscles = max_m
     Masque_Muscles = (torch.arange(max_muscles, device=device) < tailles_muscles_t.unsqueeze(1)).float()
 
     return {
@@ -168,7 +190,7 @@ if __name__ == '__main__':
         print(f"\n🚀 GÉNÉRATION {generation}")
 
         # --- Préparation du méga-univers pour cette génération ---
-        dico = preparer_mega_univers(Population, device)
+        dico = preparer_mega_univers(Population, device,MAX_NOEUDS_FIXE, MAX_MUSCLES_FIXE)
         MAX_NOEUDS = dico["masque_noeuds"].shape[1]
         MAX_MUSCLES = dico["masque_muscles"].shape[1]
         obs_size = MAX_NOEUDS * 4 + MAX_MUSCLES + 1
