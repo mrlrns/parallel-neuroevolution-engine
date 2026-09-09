@@ -85,9 +85,14 @@ class Individu:
 
                 target_x=self.x[index_to_mutate_1]
 
+                index_to_mutate_2 = None
                 for i in range (len(self.x)):
                     if abs(self.x[i] - target_x) < 0.1 and abs(self.y[i] - target_y) < 0.1:
                         index_to_mutate_2=i
+                        break
+
+                if index_to_mutate_2 is None:
+                    return
 
                 mut_x=random.uniform(-10,10)
                 mut_y=random.uniform(-10,10)
@@ -136,9 +141,10 @@ class Individu:
                         if (min(self.muscle1[i],self.muscle2[i]),max(self.muscle1[i],self.muscle2[i]))==(min(index_A,index_B),max(index_A,index_B)):
                             index_mirror=i
                             break
-                        
-                    self.is_bone[index] = (self.is_bone[index]+1)%2
-                    self.is_bone[index_mirror] = (self.is_bone[index_mirror]+1)%2
+
+                    if index_mirror is not None:
+                        self.is_bone[index] = (self.is_bone[index]+1)%2
+                        self.is_bone[index_mirror] = (self.is_bone[index_mirror]+1)%2
 
         if random.random()<rate_pop_node :
             test=self.cloner()
@@ -209,10 +215,3 @@ class Individu:
                 self.muscle1 = muscle1_t
                 self.muscle2 = muscle2_t
                 self.is_bone = is_bone_t
-
-            
-                                
-
-
-
-        
