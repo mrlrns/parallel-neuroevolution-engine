@@ -13,7 +13,6 @@ class MegaCrea:
         self.muscle1 = dico_mega_tenseurs["m1"]
         self.muscle2 = dico_mega_tenseurs["m2"]
         self.stiffness = dico_mega_tenseurs["stiffness"]
-        self.base_length = dico_mega_tenseurs["base_length"]
         self.is_bone = dico_mega_tenseurs["is_bone"]
         
         
@@ -29,7 +28,26 @@ class MegaCrea:
         self.is_bone_exp = self.is_bone.unsqueeze(1).expand(-1, batch_size, -1)
         self.mask_vrais_M_exp = (self.is_bone_exp == 0.0).float() * self.mask_M_exp
 
-        self.target_length = self.base_length.unsqueeze(1).repeat(1, batch_size, 1)
+        # --- LONGUEURS AU REPOS RECALCULÉES SUR LES POSITIONS BRUITÉES ---
+        # base_length venait du dico, calculé sur la topologie non bruitée : la
+        # créature démarrait donc hors équilibre, et la relaxation des ressorts
+        # fournissait une impulsion que le reward compte mais que la pénalité
+        # énergétique ne facture pas. En recalculant ici, chaque rollout part
+        # exactement au repos : tout déplacement vient d'une commande musculaire.
+        m1e = self.muscle1.unsqueeze(1).expand(-1, batch_size, -1)
+        m2e = self.muscle2.unsqueeze(1).expand(-1, batch_size, -1)
+
+        X1 = torch.gather(self.X, dim=2, index=m1e)
+        Y1 = torch.gather(self.Y, dim=2, index=m1e)
+        X2 = torch.gather(self.X, dim=2, index=m2e)
+        Y2 = torch.gather(self.Y, dim=2, index=m2e)
+
+        # [POP, BATCH, MAX_MUSCLES] — une longueur au repos par rollout
+        self.base_length = torch.sqrt(torch.square(X2 - X1) + torch.square(Y2 - Y1) + 1e-8)
+        self.base_length = self.base_length * self.mask_M_exp
+
+        self.target_length = self.base_length.clone()
+
         self.c = 2 * torch.sqrt(self.stiffness).unsqueeze(1).expand(-1, batch_size, -1)
         self.masses = torch.ones_like(self.X)
         
@@ -179,7 +197,9 @@ class MegaCrea:
         """
         L'action venant du réseau aura la forme [POP_SIZE, BATCH_SIZE, MAX_MUSCLES]
         """
-        base = self.base_length.unsqueeze(1).expand(-1, self.batch_size, -1)
+        # base_length est deja [POP, BATCH, MAX_MUSCLES] depuis le recalcul
+        # sur les positions bruitees : plus de unsqueeze/expand ici.
+        base = self.base_length
         new_lengths = torch.clamp(base - 0.3 * base * action, min=0.3 * base)
         
         # torch.where permet de ne modifier QUE les vrais muscles, 
