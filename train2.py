@@ -18,6 +18,7 @@ import random
 
 from brain import Brain
 from megaVecto import MegaCrea
+from logger import Logger
 
 # ==========================================
 # ⚙️ CONFIGURATION
@@ -105,6 +106,17 @@ if donnees['brain_weights'] is not None:
 optimizer = torch.optim.Adam(cerveau.parameters(), lr=LEARNING_RATE)
 
 os.makedirs("champion_raffine", exist_ok=True)
+os.makedirs("runs", exist_ok=True)
+
+logger = Logger(
+    "runs/train_phase2.jsonl",
+    run_config={
+        "chemin_champion": CHEMIN_CHAMPION, "seed": SEED, "batch_size": BATCH_SIZE,
+        "nb_episodes": NB_EPISODES, "sub_step": SUB_STEP, "frame_nb": FRAME_NB,
+        "learning_rate": LEARNING_RATE, "coef_energie": COEF_ENERGIE,
+        "coef_hauteur": COEF_HAUTEUR,
+    },
+)
 
 meilleur_score_global = float('-inf')
 meilleurs_poids = None
@@ -153,6 +165,7 @@ for episode in range(NB_EPISODES):
 
     if explosion:
         print(f"  💥 Explosion à l'épisode {episode}, épisode ignoré.")
+        logger.log(episode=episode, explosion=True, bruit_scale=bruit_scale)
         optimizer.zero_grad(set_to_none=True)
         if rewards_accumulated is not None:
             del rewards_accumulated
@@ -176,10 +189,18 @@ for episode in range(NB_EPISODES):
         meilleurs_poids = {k: v.detach().clone()
                            for k, v in cerveau.state_dict().items()}
 
+    nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
+    pos_fin = torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n
+    distance_finale = (pos_fin - pos_depart).mean().item()
+
+    logger.log(
+        episode=episode, score_mean=score_moyen, score_std=scores.std().item(),
+        grad_norm=float(norm), loss=float(loss.item()),
+        distance_moyenne=distance_finale, bruit_scale=bruit_scale,
+        meilleur_score_global=meilleur_score_global, explosion=False,
+    )
+
     if episode % 10 == 0:
-        nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
-        pos_fin = torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n
-        distance_finale = (pos_fin - pos_depart).mean().item()
         print(f"Ép. {episode:4d} | moyenne: {score_moyen:8.2f} | "
               f"écart-type: {scores.std().item():8.2f} | norme gradient {norm}  | "
               f"distance moy: {distance_finale:7.2f} | bruit: {bruit_scale:.4f}")
@@ -214,3 +235,5 @@ if meilleurs_poids is not None:
     print(f"💾 Sauvegardé dans {chemin_final}")
 else:
     print("\n⚠️ Aucun épisode valide (que des explosions) — vérifie la physique.")
+
+logger.close()

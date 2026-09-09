@@ -7,6 +7,7 @@ import torch
 from individu import Individu
 from brain import Brain
 from megaVecto import MegaCrea
+from logger import Logger
 
 import random
 import hashlib
@@ -183,6 +184,17 @@ if __name__ == '__main__':
     POP_SIZE = 50
     Population = [generer_topologie(i) for i in range(POP_SIZE)]
     os.makedirs("elite_mutant", exist_ok=True)
+    os.makedirs("runs", exist_ok=True)
+
+    logger = Logger(
+        "runs/train_phase1.jsonl",
+        run_config={
+            "lr": lr, "seed": SEED, "pop_size": POP_SIZE, "batch_size": BATCH_SIZE,
+            "max_noeuds_fixe": MAX_NOEUDS_FIXE, "max_muscles_fixe": MAX_MUSCLES_FIXE,
+            "rate_new_node": rate_new_node, "rate_mut_length": rate_mut_length,
+            "rate_change_bone": rate_change_bone, "rate_pop_node": rate_pop_node,
+        },
+    )
 
     print(f" Lancement entrainement lr:{lr} rate_new_node :{rate_new_node} rate_mut_length:{rate_mut_length} rate_change_bone :{rate_change_bone} rate_pop_node :{rate_pop_node}")
 
@@ -298,6 +310,7 @@ if __name__ == '__main__':
                     mega.vY = mega.vY.detach()
             if explosion:
                 print(f"  💥 Explosion détectée à l'épisode {episode}, on saute.")
+                logger.log(generation=generation, episode=episode, explosion=True)
                 # set_to_none=True est plus efficace pour libérer la mémoire
                 optimizer.zero_grad(set_to_none=True)
                 
@@ -326,9 +339,16 @@ if __name__ == '__main__':
             norm=torch.nn.utils.clip_grad_norm_(params.values(), max_norm=10.0)
             optimizer.step()
 
+            meilleur = max(c.score_generation for c in Population)
+            moyenne_episode = torch.mean(rewards_accumulated).item()
+            logger.log(
+                generation=generation, episode=episode,
+                score_max=meilleur, score_mean=moyenne_episode,
+                grad_norm=float(norm), loss=float(loss.item()),
+                explosion=False,
+            )
+
             if episode % 5 == 0:
-                meilleur = max(c.score_generation for c in Population)
-                moyenne_episode = torch.mean(rewards_accumulated).item() 
                 print(f"  Épisode {episode} — meilleur score population: {meilleur:.2f} | moyenne CET épisode: {moyenne_episode:.2f} | norme gradient {norm}")
         # --- Les poids finaux de la génération deviennent l'héritage ---
         for p, creature in enumerate(Population):
@@ -341,6 +361,13 @@ if __name__ == '__main__':
         print(f"✅ FIN GÉNÉRATION {generation} — 🏆 Champion score: {champion.score_generation:.2f} "
               f"({len(champion.x)} noeuds, {len(champion.muscle1)} liens) | "
               f"taille moyenne pop: {taille_moy:.1f} | famille {champion.family}")
+
+        logger.log(
+            generation=generation, episode=None, record_type="generation_summary",
+            champion_score=champion.score_generation,
+            champion_nb_noeuds=len(champion.x), champion_nb_liens=len(champion.muscle1),
+            champion_family=champion.family, taille_moyenne_pop=taille_moy,
+        )
 
         x_base = torch.tensor(champion.x, dtype=torch.float32)
         y_base = torch.tensor(champion.y, dtype=torch.float32)
@@ -369,3 +396,5 @@ if __name__ == '__main__':
             child.score_generation = float('-inf')
             new_population.append(child)
         Population = new_population
+
+    logger.close()
