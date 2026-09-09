@@ -15,6 +15,7 @@ import copy
 import os
 from torch.func import stack_module_state, functional_call, vmap
 import random
+from datetime import datetime
 
 from brain import Brain
 from megaVecto import MegaCrea
@@ -108,8 +109,9 @@ optimizer = torch.optim.Adam(cerveau.parameters(), lr=LEARNING_RATE)
 os.makedirs("champion_raffine", exist_ok=True)
 os.makedirs("runs", exist_ok=True)
 
+run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 logger = Logger(
-    "runs/train_phase2.jsonl",
+    f"runs/train_phase2_{run_id}.jsonl",
     run_config={
         "chemin_champion": CHEMIN_CHAMPION, "seed": SEED, "batch_size": BATCH_SIZE,
         "nb_episodes": NB_EPISODES, "sub_step": SUB_STEP, "frame_nb": FRAME_NB,

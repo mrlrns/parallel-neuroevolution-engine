@@ -12,6 +12,7 @@ from logger import Logger
 import random
 import hashlib
 import copy
+from datetime import datetime
 from torch.func import stack_module_state, functional_call, vmap
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
@@ -186,8 +187,9 @@ if __name__ == '__main__':
     os.makedirs("elite_mutant", exist_ok=True)
     os.makedirs("runs", exist_ok=True)
 
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     logger = Logger(
-        "runs/train_phase1.jsonl",
+        f"runs/train_phase1_{run_id}.jsonl",
         run_config={
             "lr": lr, "seed": SEED, "pop_size": POP_SIZE, "batch_size": BATCH_SIZE,
             "max_noeuds_fixe": MAX_NOEUDS_FIXE, "max_muscles_fixe": MAX_MUSCLES_FIXE,
