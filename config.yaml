@@ -1,0 +1,66 @@
+# ============================================================================
+# Configuration par défaut du dépôt.
+#
+# Modifie ces valeurs pour changer le comportement de train.py, train2.py,
+# visualize.py, test.py et test2.py — sans toucher au code.
+#
+# Chaque script n'utilise qu'un sous-ensemble de ces champs (voir les
+# commentaires). Tu peux aussi surcharger n'importe quel champ en ligne de
+# commande, ex : python train.py --lr 0.0005
+# Voir toutes les options d'un script avec : python train.py --help
+# ============================================================================
+
+# ---------- Chemins ----------
+dossier_elite_mutant: "elite_mutant"          # sortie phase 1 (train.py)
+dossier_champion_raffine: "champion_raffine"  # sortie phase 2 (train2.py)
+dossier_runs: "runs"                          # logs .jsonl
+dossier_videos: "videos"                      # sortie visualize.py
+
+# Fichier .pt du champion à charger — requis par train2.py, visualize.py,
+# test.py et test2.py. Laisse à null et passe --chemin-champion en CLI,
+# ou renseigne le chemin directement ici.
+chemin_champion: null
+
+# ---------- Reproductibilité ----------
+seed: 0
+
+# ---------- Simulation physique ----------
+sub_step: 10      # nombre de sous-pas physiques par frame
+frame_nb: 200     # nombre de frames par épisode
+
+# ---------- Phase 1 : train.py (évolution de la population) ----------
+batch_size: 30
+max_noeuds_fixe: 20
+max_muscles_fixe: 30
+pop_size: 50
+nb_generations: 30
+lr: 0.001
+rate_new_node: 0.1
+rate_mut_length: 0.3
+rate_change_bone: 0.2
+rate_pop_node: 0.15
+coef_energie: 10000.0
+coef_hauteur: 0.0
+bruit_action: 0.02
+
+# ---------- Phase 2 : train2.py (raffinement d'un champion figé) ----------
+train2_batch_size: 2000
+nb_episodes: 300
+learning_rate: 0.00005
+sauvegarde_tous_les: 25
+
+# ---------- visualize.py ----------
+largeur_ecran: 1200
+hauteur_ecran: 800
+fps_video: 60.0
+nb_frames_visualisation: 300
+bruit_visualisation: 0.02
+nom_video: "episode.mp4"
+
+# ---------- test.py (balayage de seeds) ----------
+nb_seeds: 50
+nb_frames_test: 1000
+bruit_test: 0.02
+
+# ---------- test2.py (reproduction des conditions d'entraînement) ----------
+nb_repetitions: 20

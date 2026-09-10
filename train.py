@@ -8,6 +8,7 @@ from individu import Individu
 from brain import Brain
 from megaVecto import MegaCrea
 from logger import Logger
+from config import Config, build_argparser, load_config
 
 import random
 import hashlib
@@ -19,12 +20,6 @@ from torch.nn.utils.rnn import pad_sequence
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device utilisé : {device}")
-
-SUB_STEP = 10
-BATCH_SIZE = 30
-MAX_NOEUDS_FIXE = 20
-MAX_MUSCLES_FIXE = 30
-dt = torch.tensor(1.0 / SUB_STEP, device=device)
 
 
 def generer_topologie(i):
@@ -169,27 +164,36 @@ def preparer_mega_univers(Population, device,max_n, max_m):
     }
 
 
-if __name__ == '__main__':
+def main():
+    parser = build_argparser("train")
+    args = parser.parse_args()
+    cfg: Config = load_config(args)
 
-    lr=1e-3
+    SUB_STEP = cfg.sub_step
+    BATCH_SIZE = cfg.batch_size
+    MAX_NOEUDS_FIXE = cfg.max_noeuds_fixe
+    MAX_MUSCLES_FIXE = cfg.max_muscles_fixe
+    dt = torch.tensor(1.0 / SUB_STEP, device=device)
 
-    rate_new_node=0.1
-    rate_mut_length=0.3
-    rate_change_bone=0.2
-    rate_pop_node=0.15
+    lr = cfg.lr
 
-    SEED = 0
+    rate_new_node = cfg.rate_new_node
+    rate_mut_length = cfg.rate_mut_length
+    rate_change_bone = cfg.rate_change_bone
+    rate_pop_node = cfg.rate_pop_node
+
+    SEED = cfg.seed
     random.seed(SEED)
     torch.manual_seed(SEED)
 
-    POP_SIZE = 50
+    POP_SIZE = cfg.pop_size
     Population = [generer_topologie(i) for i in range(POP_SIZE)]
-    os.makedirs("elite_mutant", exist_ok=True)
-    os.makedirs("runs", exist_ok=True)
+    os.makedirs(cfg.dossier_elite_mutant, exist_ok=True)
+    os.makedirs(cfg.dossier_runs, exist_ok=True)
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     logger = Logger(
-        f"runs/train_phase1_{run_id}.jsonl",
+        f"{cfg.dossier_runs}/train_phase1_{run_id}.jsonl",
         run_config={
             "lr": lr, "seed": SEED, "pop_size": POP_SIZE, "batch_size": BATCH_SIZE,
             "max_noeuds_fixe": MAX_NOEUDS_FIXE, "max_muscles_fixe": MAX_MUSCLES_FIXE,
@@ -200,7 +204,7 @@ if __name__ == '__main__':
 
     print(f" Lancement entrainement lr:{lr} rate_new_node :{rate_new_node} rate_mut_length:{rate_mut_length} rate_change_bone :{rate_change_bone} rate_pop_node :{rate_pop_node}")
 
-    for generation in range(30):
+    for generation in range(cfg.nb_generations):
         print(f"\n🚀 GÉNÉRATION {generation}")
 
         # --- Préparation du méga-univers pour cette génération ---
@@ -210,12 +214,12 @@ if __name__ == '__main__':
         obs_size = MAX_NOEUDS * 4 + MAX_MUSCLES + 1
         action_size = MAX_MUSCLES
 
-        frame_nb = 200
+        frame_nb = cfg.frame_nb
         nb_episodes = 30 if generation < 3 else 20
         
         # Phase d'exploration : Énergie gratuite et on tolère les rebonds
-        coef_energie = 10000.0 
-        coef_hauteur = 0.0      # Aucune punition si elle rebondit
+        coef_energie = cfg.coef_energie
+        coef_hauteur = cfg.coef_hauteur      # Aucune punition si elle rebondit
     
         # --- Création des POP_SIZE * BATCH_SIZE cerveaux ---
         brains_liste = []
@@ -290,7 +294,7 @@ if __name__ == '__main__':
                     action = brain_batch(params, buffers, obs)
                     
 
-                    bruit = torch.randn_like(action) * 0.02
+                    bruit = torch.randn_like(action) * cfg.bruit_action
                     mega.apply_action(action + bruit,frame)
 
                     reward_step = mega.get_reward(coef_energie,coef_hauteur)  # [POP, BATCH]
@@ -387,7 +391,7 @@ if __name__ == '__main__':
             'muscle1': m1, 'muscle2': m2, 'stiffness': stiff, 'target_length': t_len,
             'brain_weights': champion.brain_weights,
             'max_noeuds': MAX_NOEUDS, 'max_muscles': MAX_MUSCLES
-        }, os.path.join("elite_mutant", nom_fichier))
+        }, os.path.join(cfg.dossier_elite_mutant, nom_fichier))
 
         moitie = len(Population) // 2
         survivants = Population[:moitie]
@@ -400,3 +404,7 @@ if __name__ == '__main__':
         Population = new_population
 
     logger.close()
+
+
+if __name__ == '__main__':
+    main()
