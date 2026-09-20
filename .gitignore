@@ -1,13 +1,15 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Sorties d'entraînement
 *.pt
-videos_ia*/
+!champion_raffine/reference.pt
 elite_mutant/
 mutants_d_elite/
-champion_raffine/
-*.pt
+runs/
+
+# Vidéos
 *.mp4
-elite_mutant/
-champion_raffine/
-test*.py
+videos/
+videos_ia*/

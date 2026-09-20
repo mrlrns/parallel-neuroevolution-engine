@@ -217,7 +217,7 @@ def main():
         frame_nb = cfg.frame_nb
         nb_episodes = 30 if generation < 3 else 20
         
-        # Phase d'exploration : Énergie gratuite et on tolère les rebonds
+        # Objectif constant sur tout le run (curriculum supprimé, cf. E7)
         coef_energie = cfg.coef_energie
         coef_hauteur = cfg.coef_hauteur      # Aucune punition si elle rebondit
     

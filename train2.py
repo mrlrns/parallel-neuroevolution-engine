@@ -7,7 +7,7 @@ Contrairement à train.py :
   - Des centaines d'épisodes d'affilée pour laisser converger la nage
 
 Usage :
-    python train2.py --chemin-champion elite_mutant/champion_gen_28_score_222.8_family_14.pt
+    python train2.py --chemin-champion elite_mutant/champion_gen_17_score_231.4_family_1.pt
     python train2.py --config config.yaml --chemin-champion ... --nb-episodes 500
 """
 
@@ -190,12 +190,6 @@ def main():
             continue
 
         loss = -torch.sum(rewards_accumulated) / BATCH_SIZE
-
-        optimizer.zero_grad()
-        loss.backward()
-        norm=torch.nn.utils.clip_grad_norm_(cerveau.parameters(), max_norm=10.0)
-        optimizer.step()
-
         # --- Suivi et sauvegarde du meilleur ---
         scores = rewards_accumulated[0]                      # [BATCH]
         score_moyen = scores.mean().item()
@@ -203,8 +197,12 @@ def main():
         if score_moyen > meilleur_score_global:
             meilleur_score_global = score_moyen
             meilleurs_poids = {k: v.detach().clone()
-                               for k, v in cerveau.state_dict().items()}
+                        for k, v in cerveau.state_dict().items()}
 
+        optimizer.zero_grad()
+        loss.backward()
+        norm=torch.nn.utils.clip_grad_norm_(cerveau.parameters(), max_norm=10.0)
+        optimizer.step()
         nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
         pos_fin = torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n
         distance_finale = (pos_fin - pos_depart).mean().item()

@@ -291,6 +291,49 @@ locks onto a fixed point within its 300-frame training horizon. Beyond 300 frame
 the behaviour degrades — expected, since that is the edge of the training
 distribution.
 
+## E10 — A policy can travel twice as far and still be unusable
+
+**Date:** 2026/09/20
+
+**Setup.** Two candidates compared as the repository's reference champion, both
+replayed with `evaluate_seeds.py`, 20 seeds × 1000 frames, identical conditions.
+
+| checkpoint | topology | mean displacement | range |
+|---|---|---|---|
+| `raffine_ep250` | 9 nodes, 12 links | 577 | 156 – 791 |
+| `raffine_ep100` | 11 nodes, 16 links | 1064 | 82 – 1538 |
+
+**Result 1 — the wider spread is bimodal, not noisy.** `ep100` produces either
+~1300–1540 (13 seeds) or ~80–730 (7 seeds), with nothing in between. On the
+failing seeds the action vector freezes at constant values from roughly frame 100
+onward: the policy settles into a fixed point and stops swimming. `ep250` is
+unimodal over the same range of initial conditions.
+
+**Result 2 — the archived score is not the score that was earned.** Replaying
+`ep100` under exact phase-1 conditions (`verify_reproducibility.py`, 20 × 30
+samples) gives a best of **282.96** and a mean of **172**, against an announced
+**427.9** — a 34% gap, the same signature as E6.
+
+**Cause.** E6 was fixed in `train.py` but not in `train2.py`, where
+`meilleurs_poids` was still extracted from `cerveau.state_dict()` *after*
+`optimizer.step()`. Every phase-2 checkpoint produced before this date is
+therefore one gradient step past the policy that earned its filename.
+
+**Fix.** Move the champion capture before `optimizer.step()` in `train2.py`, as
+was done in `train.py` after E6.
+
+**Caveat.** One gradient step at `lr = 5e-5` does not plausibly account for a
+factor of 1.5. The announced 427.9 most likely also comes from a run on a
+different reward scale — E1 documents a ×3.3 change in the energy penalty between
+versions. The number is not comparable to anything measured since, and is not
+used anywhere in the repository.
+
+**Conclusion.** Mean displacement alone is not a selection criterion. `ep100` goes
+further on average and produces the most convincing gait visually, but it is
+bimodal and its provenance is broken; `ep250` is slower and reproducible. The
+repository ships `ep250` as `champion_raffine/reference.pt` and uses `ep100` only
+as the README demonstration GIF, labelled as such.
+
 ## Open questions
 
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to
@@ -303,14 +346,6 @@ distribution.
 - Adam is re-instantiated at every generation in `train.py`, so its moment estimates reset
   roughly every 20 episodes. Unavoidable in part (parameter shapes change under mutation),
   but it means phase 1 never runs a warm optimiser.
-- Mutation operators were asymmetric (nothing removed nodes). A mirrored-pair
-  deletion operator with connectivity check and index remapping now keeps mean
-  population size stable at ~9 nodes over 30 generations.
-- `MAX_NOEUDS` / `MAX_MUSCLES` are dictated by the largest creature in the
-  population, so one creature growing resizes every network — the observation
-  vector's blocks shift and previously learned weights read the wrong inputs.
-  Suspected cause of the abrupt drops at generations 14 and 23. Fix: fix these
-  dimensions for the whole run.
 - The reward still telescopes to net displacement, so nothing requires sustained
   motion. Next experiment: reward maintained velocity instead.
 
