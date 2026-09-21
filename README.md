@@ -1,5 +1,7 @@
 # 🧬 Massively Parallel Neuroevolution for Aquatic Soft-Body Locomotion
 
+![CI](https://github.com/mrlrns/parallel-neuroevolution-engine/actions/workflows/ci.yml/badge.svg)
+
 ![Swimming gait](docs/swim.gif)
 
 *Best swimming gait obtained so far (11 nodes, 16 links), 500 frames. This
