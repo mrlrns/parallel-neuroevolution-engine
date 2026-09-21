@@ -10,8 +10,8 @@ Usage :
 import torch
 
 from brain import Brain
-from megaVecto import MegaCrea
 from config import Config, build_argparser, load_config
+from megaVecto import MegaCrea
 
 
 def pad_1d(vec, size, dtype=torch.float32, pad_value=0.0):

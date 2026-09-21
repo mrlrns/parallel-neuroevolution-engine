@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aquatic-neuroevolution"
+version = "0.1.0"
+description = "Massively parallel neuroevolution for aquatic soft-body locomotion"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.2,<3",
+    "numpy>=1.24,<2",
+    "pygame>=2.5,<3",
+    "opencv-python>=4.8,<5",
+    "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[tool.setuptools]
+py-modules = [
+    "brain",
+    "individu",
+    "megaVecto",
+    "logger",
+    "config",
+    "train",
+    "train2",
+    "visualize",
+    "evaluate_seeds",
+    "verify_reproducibility",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+exclude = ["^tests/"]

@@ -34,7 +34,6 @@ from typing import Optional
 
 import yaml
 
-
 # ==========================================================================
 # 📦 LE DATACLASS : une seule source de vérité pour tous les paramètres
 # ==========================================================================

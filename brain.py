@@ -1,7 +1,5 @@
 import torch
-import torch.nn as nn 
-
-
+import torch.nn as nn
 
 
 class Brain(nn.Module):
@@ -16,7 +14,7 @@ class Brain(nn.Module):
         x=torch.relu(self.layer2(x))
         x=torch.tanh(self.layer3(x))
         return x
-    
-    
-    
-    
+
+
+
+

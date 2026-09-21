@@ -2,6 +2,7 @@ import copy
 import random
 from collections import defaultdict
 
+
 class Individu:
     def __init__(self, x, y, muscle1, muscle2, is_bone,family, brain_weights=None):
         # --- 1. L'ADN Morphologique ---
@@ -11,14 +12,14 @@ class Individu:
         self.muscle2 = muscle2
         self.is_bone = is_bone
         self.family=family
-        
+
         # --- 2. L'Héritage Cérébral ---
         # Si on crée une créature de zéro, elle n'a pas de poids (None).
         # Si c'est un enfant, il recevra les poids de son parent.
         self.brain_weights = brain_weights
-        
+
         # --- 3. L'Évaluation ---
-        # On initialise le score à l'infini négatif pour que toute 
+        # On initialise le score à l'infini négatif pour que toute
         # première tentative devienne le "meilleur" score.
         self.best_score = float('-inf')
         self.score_generation = float('-inf')
@@ -54,7 +55,7 @@ class Individu:
                 # L'attache est un noeud supérieur : on calcule les coordonnées de son miroir
                 x_cible = self.x[attache_haut]
                 y_cible = 400 + (400 - self.y[attache_haut])
-    
+
                 # On cherche le noeud existant qui possède ces coordonnées
                 attache_bas = None
                 for i in range(len(self.x)):
@@ -76,7 +77,7 @@ class Individu:
                 self.muscle1.append(attache_bas)
                 self.muscle2.append(index_nouveau_bas)
                 self.is_bone.append(type_lien)
-            
+
         if random.random()<rate_mut_length:
             index_to_mutate_1=random.randint(0,len(self.x)-1)
 
@@ -104,7 +105,7 @@ class Individu:
             else:
 
                 mut_x=random.uniform(-10,10)
-                
+
 
                 self.x[index_to_mutate_1]+=mut_x
 
@@ -112,7 +113,7 @@ class Individu:
 
 
         if random.random()<rate_change_bone:
-            
+
             index=random.randint(0,len(self.muscle1)-1)
 
             if self.y[self.muscle1[index]] ==400 and self.y[self.muscle2[index]]==400 :
@@ -131,10 +132,10 @@ class Individu:
                 for i in range (len(self.x)):
                     if abs(self.x[i] - A_mirror[0]) < 0.1 and abs(self.y[i] - A_mirror[1]) < 0.1:
                         index_A=i
-                        
+
                     if abs(self.x[i] - B_mirror[0]) < 0.1 and abs(self.y[i] - B_mirror[1]) < 0.1:
                         index_B=i
-                        
+
                 index_mirror=None
                 if index_A is not None and index_B is not None:
                     for i in range (len(self.muscle1)):
@@ -184,7 +185,7 @@ class Individu:
                     muscle1_t.append(test.muscle1[k])
                     muscle2_t.append(test.muscle2[k])
                     is_bone_t.append(test.is_bone[k])
-                    
+
 
 
             for k in range (len(muscle1_t)):
@@ -209,7 +210,7 @@ class Individu:
             if len(test.x)< 5 or sum(1 for b in is_bone_t if b == 0.0) < 2:
                 return
             if connexe :
-                
+
                 self.x = test.x
                 self.y = test.y
                 self.muscle1 = muscle1_t

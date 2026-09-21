@@ -1,0 +1,11 @@
+torch<3,>=2.2
+numpy<2,>=1.24
+pygame<3,>=2.5
+opencv-python<5,>=4.8
+pyyaml<7,>=6.0
+
+[dev]
+pytest>=8.0
+ruff>=0.6
+mypy>=1.10
+types-PyYAML

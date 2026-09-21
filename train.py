@@ -1,22 +1,22 @@
 import os
+
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
-import torch
-
-
-from individu import Individu
-from brain import Brain
-from megaVecto import MegaCrea
-from logger import Logger
-from config import Config, build_argparser, load_config
-
-import random
-import hashlib
 import copy
+import hashlib
+import random
 from datetime import datetime
-from torch.func import stack_module_state, functional_call, vmap
+
+import torch
 import torch.nn as nn
+from torch.func import functional_call, stack_module_state, vmap
 from torch.nn.utils.rnn import pad_sequence
+
+from brain import Brain
+from config import Config, build_argparser, load_config
+from individu import Individu
+from logger import Logger
+from megaVecto import MegaCrea
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Device utilisé : {device}")
@@ -59,7 +59,7 @@ def generer_topologie(i):
             attaches = (attache, attache + 1)   # rigide
         else:
             attaches = (attache,)              # articulé
-            
+
         for a in attaches:
             link = (min(a, i2), max(a, i2))
             links.add(link)
@@ -216,11 +216,11 @@ def main():
 
         frame_nb = cfg.frame_nb
         nb_episodes = 30 if generation < 3 else 20
-        
+
         # Objectif constant sur tout le run (curriculum supprimé, cf. E7)
         coef_energie = cfg.coef_energie
         coef_hauteur = cfg.coef_hauteur      # Aucune punition si elle rebondit
-    
+
         # --- Création des POP_SIZE * BATCH_SIZE cerveaux ---
         brains_liste = []
         for creature in Population:
@@ -241,29 +241,29 @@ def main():
                             min_o = min(old_obs, obs_size)
                             new_tensor[:, :min_o] = v[:, :min_o]
                             new_w[k] = new_tensor
-                            
+
                         elif k == 'layer3.weight':
                             # On retaille la couche de sortie (actions)
                             new_tensor = torch.zeros((action_size, 64), device=device)
                             min_a = min(old_act, action_size)
                             new_tensor[:min_a, :] = v[:min_a, :]
                             new_w[k] = new_tensor
-                            
+
                         elif k == 'layer3.bias':
                             # On retaille le biais de sortie
                             new_tensor = torch.zeros((action_size,), device=device)
                             min_a = min(old_act, action_size)
                             new_tensor[:min_a] = v[:min_a]
                             new_w[k] = new_tensor
-                            
+
                         else:
                             # Les couches cachées ne changent pas de taille
                             new_w[k] = v.clone()
-                            
+
                     creature.brain_weights = new_w
             # --------------------------------
 
-            
+
             b = Brain(obs_size, action_size).to(device)
             if creature.brain_weights is not None:
                 b.load_state_dict(creature.brain_weights)
@@ -277,7 +277,7 @@ def main():
             return functional_call(brain_architecture, (parametres, tampons), (observation,))
 
         brain_batch = vmap(fmodel, in_dims=(0, 0, 0))
-        
+
         optimizer = torch.optim.Adam(params.values(), lr=lr)
 
         for episode in range(nb_episodes):
@@ -289,10 +289,10 @@ def main():
             for frame in range(frame_nb):
                 if frame % 5 == 0:
                     obs = mega.get_observation(frame)  # [POP, BATCH, obs_size]
-                    
+
 
                     action = brain_batch(params, buffers, obs)
-                    
+
 
                     bruit = torch.randn_like(action) * cfg.bruit_action
                     mega.apply_action(action + bruit,frame)
@@ -300,7 +300,7 @@ def main():
                     reward_step = mega.get_reward(coef_energie,coef_hauteur)  # [POP, BATCH]
                     rewards_accumulated = reward_step if rewards_accumulated is None else rewards_accumulated + reward_step
 
-                
+
                 for _ in range(SUB_STEP):
                     mega.apply_physics(dt)
 
@@ -319,19 +319,19 @@ def main():
                 logger.log(generation=generation, episode=episode, explosion=True)
                 # set_to_none=True est plus efficace pour libérer la mémoire
                 optimizer.zero_grad(set_to_none=True)
-                
+
                 # 🧹 LA SÉCURITÉ MÉMOIRE 🧹
                 # On détruit le graphe de calcul accumulé pour libérer la VRAM
                 if rewards_accumulated is not None:
                     del rewards_accumulated
                     rewards_accumulated = None
-                torch.cuda.empty_cache() 
-                
+                torch.cuda.empty_cache()
+
                 continue
 
             loss = -torch.sum(rewards_accumulated) / (POP_SIZE * BATCH_SIZE)
 
-            
+
 
                         # --- Suivi de la performance moyenne de chaque créature ---
             for p, creature in enumerate(Population):

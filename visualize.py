@@ -7,19 +7,18 @@ Usage :
 """
 
 import os
-##os.environ["SDL_VIDEODRIVER"] = "dummy"
-
-import pygame
 import sys
-import torch
-import torch.nn.functional as F
 
-from brain import Brain
-from megaVecto import MegaCrea
-from config import Config, build_argparser, load_config
 import cv2
 import numpy as np
-import os
+
+##os.environ["SDL_VIDEODRIVER"] = "dummy"
+import pygame
+import torch
+
+from brain import Brain
+from config import Config, build_argparser, load_config
+from megaVecto import MegaCrea
 
 
 def pad_1d(vec, size, dtype=torch.float32, pad_value=0.0):

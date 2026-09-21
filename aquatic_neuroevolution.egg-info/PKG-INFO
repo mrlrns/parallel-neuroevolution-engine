@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: aquatic-neuroevolution
+Version: 0.1.0
+Summary: Massively parallel neuroevolution for aquatic soft-body locomotion
+Requires-Python: >=3.10
+License-File: LICENSE
+Requires-Dist: torch<3,>=2.2
+Requires-Dist: numpy<2,>=1.24
+Requires-Dist: pygame<3,>=2.5
+Requires-Dist: opencv-python<5,>=4.8
+Requires-Dist: pyyaml<7,>=6.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: ruff>=0.6; extra == "dev"
+Requires-Dist: mypy>=1.10; extra == "dev"
+Requires-Dist: types-PyYAML; extra == "dev"
+Dynamic: license-file

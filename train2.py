@@ -11,18 +11,16 @@ Usage :
     python train2.py --config config.yaml --chemin-champion ... --nb-episodes 500
 """
 
-import torch
-import torch.nn as nn
-import copy
 import os
-from torch.func import stack_module_state, functional_call, vmap
 import random
 from datetime import datetime
 
+import torch
+
 from brain import Brain
-from megaVecto import MegaCrea
-from logger import Logger
 from config import Config, build_argparser, load_config
+from logger import Logger
+from megaVecto import MegaCrea
 
 
 def pad_1d(vec, size, device, dtype=torch.float32, pad_value=0.0):
