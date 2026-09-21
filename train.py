@@ -3,7 +3,6 @@ import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 import copy
-import hashlib
 import random
 from datetime import datetime
 
@@ -77,9 +76,9 @@ def generer_topologie(i):
         links.add(lien)
         is_bone_dict[lien] = type_os
 
-    muscle1l = [l[0] for l in links]
-    muscle2l = [l[1] for l in links]
-    is_bone = [is_bone_dict[l] for l in links]
+    muscle1l = [lien[0] for lien in links]
+    muscle2l = [lien[1] for lien in links]
+    is_bone = [is_bone_dict[lien] for lien in links]
 
     # --- Garde-fous des DEUX côtés ---
     nb_os = sum(is_bone)
@@ -381,9 +380,6 @@ def main():
         m2 = torch.tensor(champion.muscle2, dtype=torch.long)
         stiff = torch.tensor([1.0 + 4 * s for s in champion.is_bone], dtype=torch.float32)
         t_len = torch.hypot(x_base[m1] - x_base[m2], y_base[m1] - y_base[m2])
-
-        adn_texte = str(champion.x) + str(champion.y) + str(champion.is_bone)
-        empreinte = hashlib.md5(adn_texte.encode()).hexdigest()[:6]
         nom_fichier = f"champion_gen_{generation}_score_{champion.score_generation:.1f}_family_{champion.family}.pt"
 
         torch.save({
