@@ -2,7 +2,7 @@
 Rejoue un champion sauvegardé et exporte une vidéo de sa nage.
 
 Usage :
-    python visualize.py --chemin-champion champion_raffine/FINAL_score_222.9.pt
+    python visualize.py --chemin-champion champion_raffine/reference.pt
     python visualize.py --config config.yaml --chemin-champion ... --nom-video demo.mp4
 """
 

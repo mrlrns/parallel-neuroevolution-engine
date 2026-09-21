@@ -3,8 +3,8 @@ Balaye plusieurs seeds pour un champion donné et affiche le déplacement obtenu
 pour chacune, afin de repérer les seeds les plus favorables.
 
 Usage :
-    python test.py --chemin-champion champion_raffine/FINAL_score_222.9.pt
-    python test.py --config config.yaml --chemin-champion ... --nb-seeds 100
+    python evaluate_seeds.py --chemin-champion champion_raffine/reference.pt
+    python evaluate_seeds.py --config config.yaml --chemin-champion ... --nb-seeds 100
 """
 
 import torch

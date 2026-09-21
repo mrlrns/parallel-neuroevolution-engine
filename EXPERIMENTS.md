@@ -339,10 +339,9 @@ as the README demonstration GIF, labelled as such.
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to
   the displacement reward? If the motion is partly a diagonal fall, distance overstates
   swimming performance.
-- The `coef_hauteur` penalty introduced at generation 15 penalises `|Δ| of the barycentre's
-  vertical position`. Undulatory swimming necessarily moves the barycentre vertically —
-  this may be penalising the target behaviour. Worth testing a progressive schedule, or
-  removing it entirely.
+- `coef_hauteur` is currently 0. Undulatory swimming necessarily moves the barycentre
+  vertically, so a height penalty may punish the target behaviour — worth testing a
+  progressive schedule before reintroducing it.
 - Adam is re-instantiated at every generation in `train.py`, so its moment estimates reset
   roughly every 20 episodes. Unavoidable in part (parameter shapes change under mutation),
   but it means phase 1 never runs a warm optimiser.

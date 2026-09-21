@@ -13,7 +13,7 @@ Le score annonce est max(rewards) sur le batch. On affiche aussi la moyenne
 et le deplacement, pour separer "score reproductible" de "statistique d'extreme".
 
 Usage :
-    python test2.py --chemin-champion champion_raffine/FINAL_score_222.9.pt
+    python verify_reproducibility.py --chemin-champion champion_raffine/reference.pt
 """
 
 import torch
