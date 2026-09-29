@@ -18,18 +18,10 @@ from datetime import datetime
 import torch
 
 from brain import Brain
+from champion import charger_champion
 from config import Config, build_argparser, load_config
 from logger import Logger
 from megaVecto import MegaCrea
-
-
-def pad_1d(vec, size, device, dtype=torch.float32, pad_value=0.0):
-    """Pad un vecteur 1D à la taille voulue et ajoute la dimension POP_SIZE=1."""
-    t = torch.tensor(vec, dtype=dtype)
-    if len(vec) < size:
-        pad = torch.full((size - len(vec),), pad_value, dtype=dtype)
-        t = torch.cat([t, pad])
-    return t.unsqueeze(0).to(device)
 
 
 def main():
@@ -62,48 +54,17 @@ def main():
     # ==========================================
     # 📂 CHARGEMENT DU CHAMPION
     # ==========================================
-    donnees = torch.load(cfg.chemin_champion, map_location=device)
+    champ = charger_champion(cfg.chemin_champion, device)
+    dico = champ.dico
     print(f"✅ Champion chargé depuis {cfg.chemin_champion}")
-
-    x = donnees['x']
-    y = donnees['y']
-    is_bone = donnees['is_bone']
-    muscle1 = donnees['muscle1'].tolist() if torch.is_tensor(donnees['muscle1']) else donnees['muscle1']
-    muscle2 = donnees['muscle2'].tolist() if torch.is_tensor(donnees['muscle2']) else donnees['muscle2']
-    target_length = donnees['target_length']
-    max_noeuds = donnees['max_noeuds']
-    max_muscles = donnees['max_muscles']
-
-    num_nodes_reel = len(x)
-    num_muscles_reel = len(muscle1)
-
-    print(f"   Topologie : {num_nodes_reel} noeuds, {num_muscles_reel} liens "
-          f"({int(num_muscles_reel - sum(is_bone))} muscles, {int(sum(is_bone))} os)")
-    print(f"   Padding d'origine : max_noeuds={max_noeuds}, max_muscles={max_muscles}")
-
-    # Reconstruction du dico "méga-univers" pour UNE seule créature,
-    # avec exactement le même padding qu'à l'entraînement d'origine
-    base_length_list = target_length.tolist() if torch.is_tensor(target_length) else list(target_length)
-
-    dico = {
-        "X": pad_1d(x, max_noeuds, device),
-        "Y": pad_1d(y, max_noeuds, device),
-        "m1": pad_1d(muscle1, max_muscles, device, dtype=torch.long, pad_value=0),
-        "m2": pad_1d(muscle2, max_muscles, device, dtype=torch.long, pad_value=0),
-        "stiffness": pad_1d([1.0 + 4 * s for s in is_bone], max_muscles, device),
-        "is_bone": pad_1d(is_bone, max_muscles, device),
-        "base_length": pad_1d(base_length_list, max_muscles, device),
-        "masque_noeuds": (torch.arange(max_noeuds, device=device) < num_nodes_reel).float().unsqueeze(0),
-        "masque_muscles": (torch.arange(max_muscles, device=device) < num_muscles_reel).float().unsqueeze(0),
-    }
-
-    obs_size = max_noeuds * 4 + max_muscles + 1
-    action_size = max_muscles
+    print(f"   Topologie : {champ.num_nodes} noeuds, {champ.num_muscles} liens "
+          f"({int(champ.num_muscles - sum(champ.is_bone))} muscles, {int(sum(champ.is_bone))} os)")
+    print(f"   Padding d'origine : max_noeuds={champ.max_noeuds}, max_muscles={champ.max_muscles}")
 
     # We only build one brain that will be updated with all the gradients
-    cerveau = Brain(obs_size, action_size).to(device)
-    if donnees['brain_weights'] is not None:
-        cerveau.load_state_dict(donnees['brain_weights'])
+    cerveau = Brain(champ.obs_size, champ.action_size).to(device)
+    if champ.brain_weights is not None:
+        cerveau.load_state_dict(champ.brain_weights)
 
     # ⚡️ L'OPTIMISEUR EST CRÉÉ UNE SEULE FOIS, HORS DE TOUTE BOUCLE
     optimizer = torch.optim.Adam(cerveau.parameters(), lr=LEARNING_RATE)
@@ -126,15 +87,7 @@ def main():
     meilleurs_poids = None
 
     def sauvegarder(chemin):
-        torch.save({
-            'x': x, 'y': y, 'is_bone': is_bone,
-            'muscle1': torch.tensor(muscle1, dtype=torch.long),
-            'muscle2': torch.tensor(muscle2, dtype=torch.long),
-            'stiffness': torch.tensor([1.0 + 4 * s for s in is_bone], dtype=torch.float32),
-            'target_length': target_length,
-            'brain_weights': meilleurs_poids,
-            'max_noeuds': max_noeuds, 'max_muscles': max_muscles
-        }, chemin)
+        torch.save(champ.to_save_dict(meilleurs_poids), chemin)
 
     # ==========================================
     # 🏋️ BOUCLE D'ENTRAÎNEMENT

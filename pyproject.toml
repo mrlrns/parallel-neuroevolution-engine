@@ -30,6 +30,7 @@ py-modules = [
     "megaVecto",
     "logger",
     "config",
+    "champion",
     "train",
     "train2",
     "visualize",
