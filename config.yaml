@@ -51,6 +51,26 @@ sauvegarde_tous_les: 25
 poids_aleatoires: false       # true = cerveau réinitialisé (baseline : comparaison de méthodes)
 train2_frame_nb: 300         # horizon phase 2, distinct de frame_nb (phase 1)
 
+# ---------- baselines/ppo.py (baseline PPO sur la morphologie figée) ----------
+# Réutilise chemin_champion, seed, sub_step, train2_frame_nb, coef_energie,
+# coef_hauteur et poids_aleatoires. 1 itération = 1 épisode de ppo_n_envs
+# rollouts : même budget de simulation qu'un épisode de train2.py.
+dossier_baselines: "baselines_out"
+ppo_nb_iterations: 300
+ppo_n_envs: 2000
+ppo_lr: 0.0003
+ppo_gamma: 0.99
+ppo_gae_lambda: 0.95
+ppo_clip: 0.2
+ppo_epochs: 10
+ppo_minibatches: 8
+ppo_ent_coef: 0.0
+ppo_vf_coef: 0.5
+ppo_max_grad_norm: 0.5
+ppo_std_init: 0.2
+ppo_eval_tous_les: 5
+ppo_eval_n_envs: 500
+
 # ---------- visualize.py ----------
 largeur_ecran: 1200
 hauteur_ecran: 800

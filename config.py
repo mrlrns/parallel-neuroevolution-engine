@@ -84,6 +84,23 @@ class Config:
     sauvegarde_tous_les: int = 25
     poids_aleatoires: bool = False  # True : ignore les poids du champion (comparaison de méthodes from scratch)
 
+    # ---------- baselines/ppo.py (baseline PPO, même morphologie figée) ----------
+    dossier_baselines: str = "baselines_out"
+    ppo_nb_iterations: int = 300     # 1 itération = 1 épisode de ppo_n_envs rollouts (= 1 épisode de train2)
+    ppo_n_envs: int = 2000
+    ppo_lr: float = 3e-4
+    ppo_gamma: float = 0.99
+    ppo_gae_lambda: float = 0.95
+    ppo_clip: float = 0.2
+    ppo_epochs: int = 10
+    ppo_minibatches: int = 8
+    ppo_ent_coef: float = 0.0
+    ppo_vf_coef: float = 0.5
+    ppo_max_grad_norm: float = 0.5
+    ppo_std_init: float = 0.2
+    ppo_eval_tous_les: int = 5
+    ppo_eval_n_envs: int = 500
+
     # ---------- visualize.py ----------
     largeur_ecran: int = 1200
     hauteur_ecran: int = 800
@@ -160,6 +177,21 @@ _AIDE = {
     "learning_rate": "Taux d'apprentissage (phase 2)",
     "sauvegarde_tous_les": "Sauvegarde un checkpoint tous les N épisodes (phase 2)",
     "poids_aleatoires": "Ignore les poids du champion et part d'un cerveau aléatoire",
+    "dossier_baselines": "Dossier de sortie des checkpoints des baselines",
+    "ppo_nb_iterations": "Nombre d'itérations PPO (1 itération = 1 épisode sur tous les envs)",
+    "ppo_n_envs": "Nombre d'environnements parallèles (PPO)",
+    "ppo_lr": "Taux d'apprentissage (PPO)",
+    "ppo_gamma": "Facteur d'actualisation (PPO)",
+    "ppo_gae_lambda": "Lambda de GAE (PPO)",
+    "ppo_clip": "Clipping du ratio de probabilités (PPO)",
+    "ppo_epochs": "Nombre de passes sur chaque rollout (PPO)",
+    "ppo_minibatches": "Nombre de minibatchs par passe (PPO)",
+    "ppo_ent_coef": "Coefficient du bonus d'entropie (PPO)",
+    "ppo_vf_coef": "Coefficient de la loss du critique (PPO)",
+    "ppo_max_grad_norm": "Clipping de la norme du gradient (PPO)",
+    "ppo_std_init": "Écart-type initial de la politique gaussienne (PPO)",
+    "ppo_eval_tous_les": "Évaluation quasi-déterministe toutes les N itérations (PPO)",
+    "ppo_eval_n_envs": "Nombre de rollouts pour l'évaluation (PPO)",
     "largeur_ecran": "Largeur de la fenêtre / vidéo (pixels)",
     "hauteur_ecran": "Hauteur de la fenêtre / vidéo (pixels)",
     "fps_video": "Images par seconde de la vidéo exportée",
@@ -187,6 +219,13 @@ _CHAMPS_PAR_SCRIPT = {
         "sub_step", "train2_frame_nb", "train2_batch_size", "nb_episodes",
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
         "poids_aleatoires",
+    ],
+    "ppo": [
+        "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
+        "train2_frame_nb", "coef_energie", "coef_hauteur", "poids_aleatoires",
+        "ppo_nb_iterations", "ppo_n_envs", "ppo_lr", "ppo_gamma", "ppo_gae_lambda",
+        "ppo_clip", "ppo_epochs", "ppo_minibatches", "ppo_ent_coef", "ppo_vf_coef",
+        "ppo_max_grad_norm", "ppo_std_init", "ppo_eval_tous_les", "ppo_eval_n_envs",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",
