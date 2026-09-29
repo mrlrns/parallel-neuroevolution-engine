@@ -6,6 +6,14 @@ deux fois, avec la même seed donc le même tirage de bruit :
   (A) boucle copiée de train2.py (sans gradient)
   (B) SwimEnv
 
+La vérification tourne TOUJOURS sur CPU. Sur CUDA, scatter_add_ (répartition
+des forces sur les nœuds dans megaVecto) additionne dans un ordre non
+déterministe : des écarts d'arrondi ~1e-7 sont amplifiés par la dynamique
+chaotique, et la boucle de train2.py diverge déjà contre ELLE-MÊME à seed
+identique (max |Δ déplacement| ≈ 96 sur 2000 rollouts, moyennes égales à 0.05 %
+près). Sur CPU l'exécution est déterministe, donc une égalité exacte teste la
+logique, et seulement elle.
+
 Critères :
   1. Déplacement final identique : les deux boucles simulent la même physique.
   2. score_A = score_B − progression des 5 dernières frames : seul le
@@ -82,7 +90,7 @@ def main():
     if not cfg.chemin_champion:
         parser.error("--chemin-champion est requis (ou renseigne 'chemin_champion' dans le YAML)")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")   # déterminisme requis, voir la docstring
     champ = charger_champion(cfg.chemin_champion, device)
     cerveau = Brain(champ.obs_size, champ.action_size).to(device)
     cerveau.load_state_dict(champ.brain_weights)

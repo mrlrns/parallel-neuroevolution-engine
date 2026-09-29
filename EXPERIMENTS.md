@@ -357,6 +357,16 @@ entirely explained by `SwimEnv` crediting each action with the motion it causes,
 which adds the last 5 frames of progress; residual after correction 3·10⁻⁵.
 The check also runs in CI (`tests/test_env.py`).
 
+**GPU runs are not bit-reproducible.** The same check on a Colab GPU (2000
+rollouts) failed: max |Δ displacement| = 125 on some rollouts, with means
+agreeing to 0.1%. Control: the `train2.py` loop against *itself*, same seed, on
+GPU — max |Δ| = 96, means 208.60 vs 208.71. The divergence is therefore not in
+`SwimEnv`: CUDA `scatter_add_` sums in a non-deterministic order, and the stiff,
+chaotic dynamics amplify ~1e-7 rounding differences over 3000 sub-steps. On CPU
+both loops stay bit-identical (re-checked on Colab CPU: Δ = 0). Consequences:
+`check_env.py` now always runs on CPU, and GPU runs are compared as
+distributions over training seeds, never as single trajectories.
+
 **Smoke test** (50 envs, 100 frames, 20 iterations, CPU): PPO from a random
 brain goes from 15.5 to 49.6 evaluation reward, KL ≈ 0.013 per update. The
 pipeline learns; this is not a result.
