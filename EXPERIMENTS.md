@@ -334,6 +334,50 @@ bimodal and its provenance is broken; `ep250` is slower and reproducible. The
 repository ships `ep250` as `champion_raffine/reference.pt` and uses `ep100` only
 as the README demonstration GIF, labelled as such.
 
+## E11 — Baseline: differentiable simulation vs PPO at equal budget
+
+**Date:** 2026/09/29 — **Status:** environment validated, runs pending.
+
+**Question.** Does the gradient through the simulator buy anything over a
+standard model-free method, and at what budget does the advantage flip?
+
+**Setup.** Morphology frozen to `champion_raffine/reference.pt`; both methods
+start from a random brain (`--poids-aleatoires`). Same physics, reward, horizon
+(`train2_frame_nb = 300`) and 2000 rollouts per iteration, so one PPO iteration
+costs exactly one `train2.py` episode in physics sub-steps (`sim_steps`).
+PPO: CleanRL-style, actor = `Brain`, separate 64-64 critic, GAE (γ = 0.99,
+λ = 0.95), clip 0.2, 10 epochs × 8 minibatches, lr 3e-4, state-independent
+log-std initialised at 0.2, log-likelihood restricted to real muscles.
+3 training seeds per method.
+
+**Environment check** (`baselines/check_env.py`, 200 rollouts × 300 frames, CPU).
+The `train2.py` loop and `SwimEnv` produce **bit-identical trajectories**
+(max |Δ displacement| = 0). Episode rewards differ by 2.26 out of 208.75 (1.1%),
+entirely explained by `SwimEnv` crediting each action with the motion it causes,
+which adds the last 5 frames of progress; residual after correction 3·10⁻⁵.
+The check also runs in CI (`tests/test_env.py`).
+
+**Smoke test** (50 envs, 100 frames, 20 iterations, CPU): PPO from a random
+brain goes from 15.5 to 49.6 evaluation reward, KL ≈ 0.013 per update. The
+pipeline learns; this is not a result.
+
+| method | score @ equal budget | evaluate_seeds mean displacement (20 × 1000 frames) | range |
+|---|---|---|---|
+| diffsim (BPTT) | ___ ± ___ | ___ | ___ |
+| PPO | ___ ± ___ | ___ | ___ |
+
+**Figure.** `docs/baseline_ppo.png`
+
+**Both outcomes are informative.**
+- Differentiable simulation reaches a given score with less simulation:
+  sample-efficiency advantage of the analytic gradient.
+- PPO catches up or overtakes: consistent with the gradient ill-conditioning
+  measured in E9, and with the short-horizon + critic approach of Xu et al.
+
+**Conclusion.** ___
+
+---
+
 ## Open questions
 
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to

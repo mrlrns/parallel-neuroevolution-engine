@@ -121,6 +121,11 @@ re-instantiated.
 | `logger.py` | Structured run logger: append-only JSONL + CSV with a growing schema |
 | `evaluate_seeds.py` | Sweeps initial-condition seeds for a champion, ranks them by displacement |
 | `verify_reproducibility.py` | Replays a champion under exact phase-1 training conditions to check its announced score |
+| `champion.py` | Loads a saved champion and rebuilds its padded single-creature tensors |
+| `baselines/env.py` | `SwimEnv`: the physics wrapped as a vectorised RL environment (no gradient) |
+| `baselines/check_env.py` | Proves `SwimEnv` reproduces the `train2.py` loop exactly — run before any baseline |
+| `baselines/ppo.py` | PPO baseline on the frozen morphology, same simulation budget as `train2.py` |
+| `baselines/compare.py` | Plots reward vs simulation budget, mean ± std over training seeds |
 | `EXPERIMENTS.md` | Experiment log: hypotheses, settings, outcomes — negative results kept |
 
 ## 🔧 Configuration
@@ -180,6 +185,35 @@ python train2.py --chemin-champion elite_mutant/champion_gen_17_score_231.4_fami
 ```
 
 Refined checkpoints are written to `champion_raffine/`.
+
+### Baseline comparison (PPO)
+
+Does backpropagating through the simulator learn better than standard model-free
+RL? The PPO baseline controls the **same frozen morphology**, with the same
+physics, reward, horizon and number of rollouts per iteration. Its actor is a
+`Brain`, so its checkpoints go through the same evaluation scripts. Both methods
+log `sim_steps` (physics sub-steps × rollouts) and are compared at **equal
+simulation budget**, not per episode.
+
+```bash
+# 1. The environment must reproduce train2.py exactly (exits with an error otherwise)
+python -m baselines.check_env --chemin-champion champion_raffine/reference.pt
+
+# 2. Both methods from a random brain, 3 training seeds each (GPU)
+for s in 0 1 2; do
+  python train2.py        --chemin-champion champion_raffine/reference.pt --poids-aleatoires --seed $s
+  python -m baselines.ppo --chemin-champion champion_raffine/reference.pt --poids-aleatoires --seed $s
+done
+
+# 3. Learning curves vs simulation budget
+python -m baselines.compare --diffsim "runs/train_phase2_seed*.jsonl" \
+                            --ppo "runs/ppo_seed*.jsonl" --sortie docs/baseline_ppo.png
+
+# 4. Final verdict: identical evaluation for every checkpoint
+python evaluate_seeds.py --chemin-champion baselines_out/ppo_seed0_best.pt --nb-seeds 20
+```
+
+Results: E11 in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ### Evaluation
 
