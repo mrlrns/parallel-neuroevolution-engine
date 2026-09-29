@@ -25,6 +25,9 @@ Remaining limitation: the reward telescopes to net displacement, so nothing yet
 requires sustained motion — behaviour degrades beyond the 300-frame training
 horizon. Next step is a reward on maintained velocity.
 
+In progress: a PPO baseline on the same frozen morphology, compared at equal
+simulation budget (see [Baseline comparison](#baseline-comparison-ppo) and E11).
+
 ## 🔬 How we got there
 
 Four compounding specification and implementation bugs had to be found first. Full
@@ -96,14 +99,14 @@ The control loop runs at a lower rate than the physics: the policy is queried **
 Two nested processes run together:
 
 - **Evolutionary search over morphology** — insertion of a mirrored node pair, deletion of a mirrored node pair (with index remapping and a BFS connectivity check), link retyping (bone ↔ muscle) and length perturbation, all constrained to preserve bilateral symmetry. Elitist selection keeps the top half of the population each generation; each survivor produces one mutated child.
-- **Gradient-based controller learning** — rewards are backpropagated *through* the differentiable physics simulator. Training uses truncated BPTT (10-frame window), gradient-norm clipping (`max_norm = 10`), and automatic detection and recovery from numerical divergence (NaN check every 20 frames, episode discarded and graph freed).
+- **Gradient-based controller learning** — rewards are backpropagated *through* the differentiable physics simulator. Training uses truncated BPTT (10-frame window), gradient-norm clipping (`max_norm = 10`), and automatic detection and recovery from numerical divergence (NaN check every 20 frames plus a finiteness check on the loss before `backward()`, episode discarded and graph freed).
 
 The two phases optimise the **same objective**: displacement with a constant energy
 penalty (`coef_energie = 10000`, `coef_hauteur = 0` throughout). An earlier version
 switched the objective mid-run — a curriculum — which made scores incomparable
 across generations for a measured effect of −1.2%; it was removed. Phase 2 differs
 from phase 1 only in that the morphology is frozen, the batch is much larger, the
-exploration noise is annealed (0.030 → 0.005) and the Adam optimiser is never
+horizon is longer (`train2_frame_nb = 300` vs `frame_nb = 200`), the exploration noise is annealed (0.030 → 0.005) and the Adam optimiser is never
 re-instantiated.
 
 ## 📁 Repository Structure
