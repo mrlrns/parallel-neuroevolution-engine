@@ -216,6 +216,8 @@ python -m baselines.compare --diffsim "runs/train_phase2_seed*.jsonl" \
 python evaluate_seeds.py --chemin-champion baselines_out/ppo_seed0_best.pt --nb-seeds 20
 ```
 
+On Colab: [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrlrns/parallel-neuroevolution-engine/blob/main/colab/baseline_runs.ipynb) — runs the whole protocol on a GPU and writes every output to Google Drive.
+
 Results: E11 in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ### Evaluation
