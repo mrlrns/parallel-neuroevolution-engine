@@ -9,6 +9,7 @@ Contrairement à train.py :
 Usage :
     python train2.py --chemin-champion elite_mutant/champion_gen_17_score_231.4_family_1.pt
     python train2.py --config config.yaml --chemin-champion ... --nb-episodes 500
+    python train2.py --chemin-champion ... --poids-aleatoires --seed 1   # comparaison de méthodes
 """
 
 import os
@@ -63,7 +64,9 @@ def main():
 
     # We only build one brain that will be updated with all the gradients
     cerveau = Brain(champ.obs_size, champ.action_size).to(device)
-    if champ.brain_weights is not None:
+    if cfg.poids_aleatoires:
+        print("   Cerveau RÉINITIALISÉ (poids aléatoires) — comparaison de méthodes")
+    elif champ.brain_weights is not None:
         cerveau.load_state_dict(champ.brain_weights)
 
     # ⚡️ L'OPTIMISEUR EST CRÉÉ UNE SEULE FOIS, HORS DE TOUTE BOUCLE
@@ -74,17 +77,21 @@ def main():
 
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     logger = Logger(
-        f"{cfg.dossier_runs}/train_phase2_{run_id}.jsonl",
+        f"{cfg.dossier_runs}/train_phase2_seed{SEED}_{run_id}.jsonl",
         run_config={
+            "method": "diffsim_bptt",
             "chemin_champion": cfg.chemin_champion, "seed": SEED, "batch_size": BATCH_SIZE,
             "nb_episodes": NB_EPISODES, "sub_step": SUB_STEP, "frame_nb": FRAME_NB,
             "learning_rate": LEARNING_RATE, "coef_energie": COEF_ENERGIE,
-            "coef_hauteur": COEF_HAUTEUR,
+            "coef_hauteur": COEF_HAUTEUR, "poids_aleatoires": cfg.poids_aleatoires,
         },
     )
 
     meilleur_score_global = float('-inf')
     meilleurs_poids = None
+    # Budget de simulation consommé : appels à apply_physics × rollouts.
+    # Unité commune avec les baselines (baselines/ppo.py) pour comparer à coût égal.
+    sim_steps = 0
 
     def sauvegarder(chemin):
         torch.save(champ.to_save_dict(meilleurs_poids), chemin)
@@ -124,6 +131,7 @@ def main():
 
             for _ in range(SUB_STEP):
                 mega.apply_physics(dt)
+            sim_steps += BATCH_SIZE * SUB_STEP
 
             if frame % 20 == 0:
                 if torch.isnan(mega.X).any() or torch.isnan(mega.Y).any():
@@ -132,7 +140,7 @@ def main():
 
         if explosion:
             print(f"  💥 Explosion à l'épisode {episode}, épisode ignoré.")
-            logger.log(episode=episode, explosion=True, bruit_scale=bruit_scale)
+            logger.log(episode=episode, explosion=True, bruit_scale=bruit_scale, sim_steps=sim_steps)
             optimizer.zero_grad(set_to_none=True)
             if rewards_accumulated is not None:
                 del rewards_accumulated
@@ -144,7 +152,7 @@ def main():
         # Le test NaN ne tourne que toutes les 20 frames : une explosion en fin
         # d'épisode passerait inaperçue et empoisonnerait les moments d'Adam.
         if not torch.isfinite(loss):
-            logger.log(episode=episode, explosion=True, bruit_scale=bruit_scale)
+            logger.log(episode=episode, explosion=True, bruit_scale=bruit_scale, sim_steps=sim_steps)
             optimizer.zero_grad(set_to_none=True)
             continue
         # --- Suivi et sauvegarde du meilleur ---
@@ -165,7 +173,7 @@ def main():
         distance_finale = (pos_fin - pos_depart).mean().item()
 
         logger.log(
-            episode=episode, score_mean=score_moyen, score_std=scores.std().item(),
+            episode=episode, sim_steps=sim_steps, score_mean=score_moyen, score_std=scores.std().item(),
             grad_norm=float(norm), loss=float(loss.item()),
             distance_moyenne=distance_finale, bruit_scale=bruit_scale,
             meilleur_score_global=meilleur_score_global, explosion=False,
@@ -183,7 +191,7 @@ def main():
     # 💾 SAUVEGARDE FINALE
     # ==========================================
     if meilleurs_poids is not None:
-        chemin_final = f"{cfg.dossier_champion_raffine}/FINAL_score_{meilleur_score_global:.1f}.pt"
+        chemin_final = f"{cfg.dossier_champion_raffine}/FINAL_seed{SEED}_score_{meilleur_score_global:.1f}.pt"
         sauvegarder(chemin_final)
         print(f"\n🏆 Terminé — meilleur score : {meilleur_score_global:.2f}")
         print(f"💾 Sauvegardé dans {chemin_final}")

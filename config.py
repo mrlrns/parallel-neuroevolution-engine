@@ -82,6 +82,7 @@ class Config:
     nb_episodes: int = 300
     learning_rate: float = 5e-5
     sauvegarde_tous_les: int = 25
+    poids_aleatoires: bool = False  # True : ignore les poids du champion (comparaison de méthodes from scratch)
 
     # ---------- visualize.py ----------
     largeur_ecran: int = 1200
@@ -158,6 +159,7 @@ _AIDE = {
     "nb_episodes": "Nombre d'épisodes d'entraînement (phase 2)",
     "learning_rate": "Taux d'apprentissage (phase 2)",
     "sauvegarde_tous_les": "Sauvegarde un checkpoint tous les N épisodes (phase 2)",
+    "poids_aleatoires": "Ignore les poids du champion et part d'un cerveau aléatoire",
     "largeur_ecran": "Largeur de la fenêtre / vidéo (pixels)",
     "hauteur_ecran": "Hauteur de la fenêtre / vidéo (pixels)",
     "fps_video": "Images par seconde de la vidéo exportée",
@@ -184,6 +186,7 @@ _CHAMPS_PAR_SCRIPT = {
         "chemin_champion", "dossier_champion_raffine", "dossier_runs", "seed",
         "sub_step", "train2_frame_nb", "train2_batch_size", "nb_episodes",
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
+        "poids_aleatoires",
     ],
     "visualize": [
         "chemin_champion", "dossier_videos", "seed", "sub_step",
