@@ -329,6 +329,12 @@ def main():
                 continue
 
             loss = -torch.sum(rewards_accumulated) / (POP_SIZE * BATCH_SIZE)
+            # Le test NaN ne tourne que toutes les 20 frames : une explosion en fin
+            # d'épisode passerait inaperçue et empoisonnerait les moments d'Adam.
+            if not torch.isfinite(loss):
+                logger.log(generation=generation, episode=episode, explosion=True)
+                optimizer.zero_grad(set_to_none=True)
+                continue
 
 
 

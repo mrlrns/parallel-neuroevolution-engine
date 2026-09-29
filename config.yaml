@@ -48,6 +48,7 @@ train2_batch_size: 2000
 nb_episodes: 300
 learning_rate: 0.00005
 sauvegarde_tous_les: 25
+train2_frame_nb: 300         # horizon phase 2, distinct de frame_nb (phase 1)
 
 # ---------- visualize.py ----------
 largeur_ecran: 1200

@@ -47,7 +47,7 @@ def main():
     BATCH_SIZE = cfg.train2_batch_size          # plus gros qu'en phase 1 : une seule créature, donc on peut se le permettre
     NB_EPISODES = cfg.nb_episodes                # le coeur de la phase 2 : beaucoup de pas d'apprentissage
     SUB_STEP = cfg.sub_step
-    FRAME_NB = cfg.frame_nb
+    FRAME_NB = cfg.train2_frame_nb          # horizon propre à la phase 2
     LEARNING_RATE = cfg.learning_rate
 
     COEF_ENERGIE = cfg.coef_energie
@@ -188,6 +188,12 @@ def main():
             continue
 
         loss = -torch.sum(rewards_accumulated) / BATCH_SIZE
+        # Le test NaN ne tourne que toutes les 20 frames : une explosion en fin
+        # d'épisode passerait inaperçue et empoisonnerait les moments d'Adam.
+        if not torch.isfinite(loss):
+            logger.log(episode=episode, explosion=True, bruit_scale=bruit_scale)
+            optimizer.zero_grad(set_to_none=True)
+            continue
         # --- Suivi et sauvegarde du meilleur ---
         scores = rewards_accumulated[0]                      # [BATCH]
         score_moyen = scores.mean().item()

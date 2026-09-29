@@ -78,6 +78,7 @@ class Config:
 
     # ---------- Phase 2 : train2.py (raffinement d'un champion figé) ----------
     train2_batch_size: int = 2000
+    train2_frame_nb: int = 300  # horizon phase 2 (la référence a été raffinée sur 300 frames, cf. E2/E9)
     nb_episodes: int = 300
     learning_rate: float = 5e-5
     sauvegarde_tous_les: int = 25
@@ -153,6 +154,7 @@ _AIDE = {
     "coef_hauteur": "Coefficient de pénalité de hauteur dans la récompense",
     "bruit_action": "Écart-type du bruit d'exploration sur les actions (phase 1)",
     "train2_batch_size": "Taille de batch (phase 2, une seule créature)",
+    "train2_frame_nb": "Nombre de frames par épisode (phase 2)",
     "nb_episodes": "Nombre d'épisodes d'entraînement (phase 2)",
     "learning_rate": "Taux d'apprentissage (phase 2)",
     "sauvegarde_tous_les": "Sauvegarde un checkpoint tous les N épisodes (phase 2)",
@@ -180,7 +182,7 @@ _CHAMPS_PAR_SCRIPT = {
     ],
     "train2": [
         "chemin_champion", "dossier_champion_raffine", "dossier_runs", "seed",
-        "sub_step", "frame_nb", "train2_batch_size", "nb_episodes",
+        "sub_step", "train2_frame_nb", "train2_batch_size", "nb_episodes",
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
     ],
     "visualize": [
