@@ -188,6 +188,10 @@ _CHAMPS_PAR_SCRIPT = {
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
         "poids_aleatoires",
     ],
+    "check_env": [
+        "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",
+        "coef_energie", "coef_hauteur", "bruit_action",
+    ],
     "visualize": [
         "chemin_champion", "dossier_videos", "seed", "sub_step",
         "largeur_ecran", "hauteur_ecran", "fps_video",

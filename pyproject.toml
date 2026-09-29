@@ -37,6 +37,7 @@ py-modules = [
     "evaluate_seeds",
     "verify_reproducibility",
 ]
+packages = ["baselines"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
