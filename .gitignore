@@ -8,6 +8,7 @@ __pycache__/
 elite_mutant/
 mutants_d_elite/
 runs/
+!results/E11/runs/
 baselines_out/
 
 # Vidéos

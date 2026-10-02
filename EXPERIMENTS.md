@@ -336,7 +336,7 @@ as the README demonstration GIF, labelled as such.
 
 ## E11 — Baseline: differentiable simulation vs PPO at equal budget
 
-**Date:** 2026/09/29 — **Status:** environment validated, runs pending.
+**Date:** 2026/09/29 – 2026/10/02 — **Status:** complete, 3 training seeds per method.
 
 **Question.** Does the gradient through the simulator buy anything over a
 standard model-free method, and at what budget does the advantage flip?
@@ -373,10 +373,56 @@ pipeline learns; this is not a result.
 
 | method | score @ equal budget | evaluate_seeds mean displacement (20 × 1000 frames) | range |
 |---|---|---|---|
-| diffsim (BPTT) | ___ ± ___ | ___ | ___ |
-| PPO | ___ ± ___ | ___ | ___ |
+| diffsim (BPTT), seed 0 | 46.5 | 106 | 44 – 148 |
+| diffsim (BPTT), seed 1 | 52.8 | 127 | 41 – 178 |
+| diffsim (BPTT), seed 2 | 45.6 | 87 | 23 – 132 |
+| PPO, seed 0 | 734.0 | 2451 | 2206 – 2750 |
+| PPO, seed 1 | 894.5 | 3255 | 2933 – 3406 |
+| PPO, seed 2 | 514.1 | 1646 | 1378 – 1903 |
+| **diffsim, mean ± std** | **48.3 ± 3.9** | **107 ± 20** | |
+| **PPO, mean ± std** | **714 ± 191** | **2451 ± 805** | |
+| reference champion (E10) | — | 577 | 156 – 791 |
+
+Score = best mean training reward over 300 iterations (diffsim: training episode, PPO: deterministic evaluation), 300 frames, budget 1.8·10⁹ physics sub-steps × rollouts for both; std = sample std over the 3 training seeds. Displacement = `evaluate_seeds.py`, 20 initial conditions × 1000 frames. Logs in `results/E11/runs/`, evaluation output in `results/E11/eval.txt`.
 
 **Figure.** `docs/baseline_ppo.png`
+
+![Differentiable simulation vs PPO](docs/baseline_ppo.png)
+
+**Observations.**
+- At equal simulation budget PPO is ~15× better on the training reward and ~23× on
+  1000-frame displacement. Its *worst* seed travels 2.9× further than the reference
+  champion obtained by evolution + refinement.
+- PPO is also far more robust across initial conditions (±11–16% of the mean over 20
+  seeds, against ±50–55% for diffsim).
+- PPO generalises beyond its 300-frame training horizon (≈2.45 units/frame on both 300
+  and 1000 frames). The degradation beyond 300 frames reported for the reference champion
+  is therefore not a property of the reward alone.
+- Video check (`visualize.py`, PPO seed 0): regular undulatory gait, no visible
+  exploit of the reward.
+- diffsim learns, but slowly and almost linearly, and its 3 seeds end within 45.6–52.8
+  whatever their start (27, 9, 28); seed 1 starts near 9 and only
+  accelerates after ~150 episodes, still rising at episode 300. Seed 0 peaks at
+  episode ~245 then degrades (std 6.5 → 11) once exploration noise hits its floor.
+- Wall-clock: one diffsim episode ≈ 15 s vs one PPO iteration ≈ 6 s on a T4 —
+  diffsim also costs ~2.5× more compute per simulation step (backward through physics).
+
+**Same seed, two GPU runs.** PPO seed 2 was accidentally run twice: best evaluation
+525.1 vs 514.1 (2%). The checkpoint kept is the second run's (both wrote the same file);
+the first log is archived in `results/E11/gpu_nondeterminism/`. A first PPO seed-1 run
+reached 863.8 but its outputs were lost (Colab Drive writes not flushed before the
+runtime ended); the rerun reached 894.5 (3.5% apart). Both pairs show that same-seed
+GPU runs differ by a few percent — small against the ×15 gap between methods, and the
+reason methods are compared across seeds, never on single runs.
+
+**Candidate causes of the gap (to test in E12).**
+1. Step size: 1 Adam update per episode at lr = 5e-5 (tuned in E4/E5 for refining an
+   already-good controller), vs 80 updates at 3e-4 for PPO.
+2. Gradient myopia: BPTT truncated every 10 frames (2 decisions), no value of the
+   state beyond the window; PPO credits actions over the full episode via its critic.
+3. Ill-conditioned analytic gradients through stiff, chaotic dynamics (E9; Suh et al.,
+   ICML 2022).
+4. Exploration: noise 0.03 → 0.005 vs policy std 0.2.
 
 **Both outcomes are informative.**
 - Differentiable simulation reaches a given score with less simulation:
@@ -384,7 +430,18 @@ pipeline learns; this is not a result.
 - PPO catches up or overtakes: consistent with the gradient ill-conditioning
   measured in E9, and with the short-horizon + critic approach of Xu et al.
 
-**Conclusion.** ___
+**Conclusion.** At equal simulation budget, PPO outperforms gradient-based learning
+through the simulator by ×15 in training reward (714 ± 191 vs 48 ± 4) and ×23 in
+1000-frame displacement, learns faster, and is more robust across initial conditions;
+it surpasses the reference champion — itself the product of morphology evolution plus
+refinement — after ~25 iterations. In its current form, train2 is not competitive for
+learning a controller from scratch. Caveat: its learning rate was tuned in E4/E5 for
+refining an already-good controller, not for learning from a random one. Next steps
+(E12): (1) one optimiser update per truncation window (every 10 frames) instead of one
+per episode, then a learning-rate sweep; (2) a learned critic V(s) bootstrapping the
+return beyond each window (SHAC, Xu et al. 2022), so the gradient horizon stays short
+where analytic gradients are well-conditioned while the policy still optimises
+long-term return.
 
 ---
 

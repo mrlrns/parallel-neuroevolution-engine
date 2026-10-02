@@ -51,7 +51,7 @@ def agreger(fichiers, cle, n_points=100):
     x_min = max(x.min() for x, _ in runs)
     grille = np.linspace(x_min, x_max, n_points)
     ys = np.stack([np.interp(grille, x, y) for x, y in runs])
-    return grille, ys.mean(0), ys.std(0), len(runs)
+    return grille, ys
 
 
 def main():
@@ -59,25 +59,36 @@ def main():
     p.add_argument("--diffsim", required=True, help="glob des logs train2.py")
     p.add_argument("--ppo", required=True, help="glob des logs baselines/ppo.py")
     p.add_argument("--sortie", default="baseline_ppo.png")
+    p.add_argument("--lineaire", action="store_true", help="axe vertical linéaire (logarithmique par défaut)")
+    p.add_argument("--reference", type=float, default=None,
+                   help="score du champion de référence, tracé en pointillés (même horizon)")
     a = p.parse_args()
 
+    # Un seul panneau : la pénalité d'énergie est négligeable, récompense ≈ déplacement.
+    # Pas de bande : avec 3 seeds, un écart-type n'est pas une estimation fiable ;
+    # on montre chaque seed (trait fin) et leur moyenne (trait épais).
     fichiers = {"diffsim": sorted(glob.glob(a.diffsim)), "ppo": sorted(glob.glob(a.ppo))}
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-    for i, titre in enumerate(("mean reward", "mean displacement")):
-        ax = axes[i]
-        for methode, fs in fichiers.items():
-            res = agreger(fs, METRIQUES[methode][i])
-            if res is None:
-                print(f"⚠️  aucun point pour {methode} ({titre})")
-                continue
-            x, m, s, n = res
-            ax.plot(x, m, label=f"{LABELS[methode]} (n={n} seeds)")
-            ax.fill_between(x, m - s, m + s, alpha=0.2)
-        ax.set_xlabel("physics sub-steps × rollouts")
-        ax.set_ylabel(titre)
-        ax.grid(alpha=0.3)
-        ax.legend(frameon=False)
-    fig.suptitle("Phase 2 — differentiable simulation vs PPO, equal simulation budget")
+    fig, ax = plt.subplots(figsize=(7.5, 4.8))
+    for methode, fs in fichiers.items():
+        res = agreger(fs, METRIQUES[methode][0])
+        if res is None:
+            print(f"⚠️  aucun point pour {methode}")
+            continue
+        x, ys = res
+        ligne, = ax.plot(x, ys.mean(0), lw=2.5, label=f"{LABELS[methode]} — mean of {ys.shape[0]} seeds")
+        for y in ys:
+            ax.plot(x, y, lw=1, alpha=0.35, color=ligne.get_color())
+    if a.reference is not None:
+        ax.axhline(a.reference, ls="--", lw=1.2, color="0.4",
+                   label="reference champion (evolution + refinement)")
+    ax.set_xlabel("simulation budget (physics sub-steps × rollouts)")
+    ax.set_ylabel("mean episode reward, 300 frames" + ("" if a.lineaire else " (log)"))
+    if not a.lineaire:
+        ax.set_yscale("log")
+    ax.grid(alpha=0.3, which="both")
+    ax.legend(frameon=False, loc="lower right")
+    ax.set_title("Differentiable simulation vs PPO at equal simulation budget\n"
+                 "random initial controller; thin lines = individual training seeds", fontsize=10)
     fig.tight_layout()
     fig.savefig(a.sortie, dpi=150)
     print(f"📈 {a.sortie}")

@@ -1,0 +1,12 @@
+== results/E11/FINAL_seed0_score_46.5.pt
+moyenne 106  [44 – 148]
+== results/E11/FINAL_seed1_score_52.8.pt
+moyenne 127  [41 – 178]
+== results/E11/FINAL_seed2_score_45.6.pt
+moyenne 87  [23 – 132]
+== results/E11/ppo_seed0_best.pt
+moyenne 2451  [2206 – 2750]
+== results/E11/ppo_seed1_best.pt
+moyenne 3255  [2933 – 3406]
+== results/E11/ppo_seed2_best.pt
+moyenne 1646  [1378 – 1903]
