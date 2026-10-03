@@ -52,6 +52,7 @@ poids_aleatoires: false       # true = cerveau réinitialisé (baseline : compar
 fenetre_bptt: 10              # troncature du gradient toutes les N frames (multiple de 5)
 maj_par_fenetre: false        # E12 : true = une mise à jour Adam par fenêtre (sinon une par épisode)
 detachement_complet: false    # E12 contrôle : troncature complète, toujours une màj par épisode
+physique_compilee: false      # true sur GPU : MegaCreaFast + torch.compile, même physique, ×3–4
 train2_frame_nb: 300         # horizon phase 2, distinct de frame_nb (phase 1)
 
 # ---------- baselines/ppo.py (baseline PPO sur la morphologie figée) ----------

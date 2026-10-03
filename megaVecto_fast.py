@@ -65,6 +65,25 @@ def pas_physique(X, Y, vX, vY, D, A, target_length, stiff, c, kN, kT, mask_M, ma
     return X + vX * dt, Y + vY * dt, vX, vY
 
 
+_PAS_COMPILE = None
+
+
+def _pas_compile():
+    """Une seule fonction compilée par processus, partagée par toutes les instances
+    (évite de recompiler à chaque épisode)."""
+    global _PAS_COMPILE
+    if _PAS_COMPILE is None:
+        _PAS_COMPILE = torch.compile(pas_physique)
+    return _PAS_COMPILE
+
+
+def classe_physique(compilee):
+    """MegaCrea (référence) ou MegaCreaFast compilée, avec la même signature."""
+    if not compilee:
+        return MegaCrea
+    return lambda dico, batch_size, device="cuda": MegaCreaFast(dico, batch_size, device=device, compile=True)
+
+
 class MegaCreaFast(MegaCrea):
     def __init__(self, dico_mega_tenseurs, batch_size, device="cuda", compile=False):
         super().__init__(dico_mega_tenseurs, batch_size, device=device)
@@ -83,7 +102,7 @@ class MegaCreaFast(MegaCrea):
         facteur = self.is_bone_exp + (1 - self.is_bone_exp) * 0.3
         self._kN = WATER_DRAG * facteur * self.mask_M_exp
         self._kT = WATER_DRAG * FACTEUR_TANGENTIEL * facteur * self.mask_M_exp
-        self._pas = torch.compile(pas_physique) if compile else pas_physique
+        self._pas = _pas_compile() if compile else pas_physique
 
     def apply_physics(self, dt):
         self.X, self.Y, self.vX, self.vY = self._pas(

@@ -23,3 +23,14 @@ def test_train2_mode_runs(tmp_path, options):
     assert res.returncode == 0, res.stderr
     assert "Terminé" in res.stdout
     assert list(tmp_path.glob("FINAL_seed0_*.pt"))
+
+
+def test_ppo_and_train2_accept_compiled_physics_flag(tmp_path):
+    """The flag must be wired through; on CPU torch.compile may be slow, so only parse + 1 tiny episode."""
+    res = subprocess.run(
+        [sys.executable, "train2.py", "--chemin-champion", str(REFERENCE), "--poids-aleatoires",
+         "--nb-episodes", "1", "--train2-batch-size", "2", "--train2-frame-nb", "10", "--sub-step", "2",
+         "--dossier-runs", str(tmp_path), "--dossier-champion-raffine", str(tmp_path), "--help"],
+        cwd=RACINE, capture_output=True, text=True, timeout=120,
+    )
+    assert "--physique-compilee" in res.stdout

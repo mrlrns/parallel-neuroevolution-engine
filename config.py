@@ -86,6 +86,7 @@ class Config:
     fenetre_bptt: int = 10          # longueur (frames) de la fenêtre de troncature du gradient, multiple de 5
     maj_par_fenetre: bool = False   # E12 : une mise à jour Adam par fenêtre au lieu d'une par épisode
     detachement_complet: bool = False  # E12 contrôle : troncature complète en mode une-màj-par-épisode
+    physique_compilee: bool = False    # MegaCreaFast + torch.compile (×3–4 sur GPU, même physique)
 
     # ---------- baselines/ppo.py (baseline PPO, même morphologie figée) ----------
     dossier_baselines: str = "baselines_out"
@@ -183,6 +184,7 @@ _AIDE = {
     "fenetre_bptt": "Longueur de la fenêtre de troncature du gradient (frames, multiple de 5)",
     "maj_par_fenetre": "Une mise à jour de l'optimiseur par fenêtre de BPTT (E12) au lieu d'une par épisode",
     "detachement_complet": "Coupe aussi les chemins obs→action et previous_distance aux frontières de fenêtre",
+    "physique_compilee": "Physique MegaCreaFast compilée par torch.compile (GPU ; même physique, ×3–4)",
     "dossier_baselines": "Dossier de sortie des checkpoints des baselines",
     "ppo_nb_iterations": "Nombre d'itérations PPO (1 itération = 1 épisode sur tous les envs)",
     "ppo_n_envs": "Nombre d'environnements parallèles (PPO)",
@@ -225,7 +227,7 @@ _CHAMPS_PAR_SCRIPT = {
         "sub_step", "train2_frame_nb", "train2_batch_size", "nb_episodes",
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
         "poids_aleatoires", "fenetre_bptt", "maj_par_fenetre",
-        "detachement_complet",
+        "detachement_complet", "physique_compilee",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
@@ -233,6 +235,7 @@ _CHAMPS_PAR_SCRIPT = {
         "ppo_nb_iterations", "ppo_n_envs", "ppo_lr", "ppo_gamma", "ppo_gae_lambda",
         "ppo_clip", "ppo_epochs", "ppo_minibatches", "ppo_ent_coef", "ppo_vf_coef",
         "ppo_max_grad_norm", "ppo_std_init", "ppo_eval_tous_les", "ppo_eval_n_envs",
+        "physique_compilee",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",

@@ -82,7 +82,8 @@ def evaluer(agent, champ, cfg, device):
     """Rollout quasi-déterministe (moyenne + bruit 0.02, comme evaluate_seeds.py)
     sur un env séparé : n'entre pas dans le budget `sim_steps`."""
     env = SwimEnv(champ.dico, cfg.ppo_eval_n_envs, cfg.train2_frame_nb, cfg.sub_step,
-                  cfg.coef_energie, cfg.coef_hauteur, device)
+                  cfg.coef_energie, cfg.coef_hauteur, device,
+                  physique_compilee=cfg.physique_compilee)
     obs = env.reset()
     total = torch.zeros(env.n, device=device)
     done = False
@@ -102,7 +103,8 @@ def entrainer(cfg: Config):
 
     champ = charger_champion(cfg.chemin_champion, device)
     env = SwimEnv(champ.dico, cfg.ppo_n_envs, cfg.train2_frame_nb, cfg.sub_step,
-                  cfg.coef_energie, cfg.coef_hauteur, device)
+                  cfg.coef_energie, cfg.coef_hauteur, device,
+                  physique_compilee=cfg.physique_compilee)
     T, N = env.nb_decisions, env.n
     obs_size, act_size = champ.obs_size, champ.action_size
 
@@ -121,7 +123,8 @@ def entrainer(cfg: Config):
         run_config={"method": "ppo", **{k: v for k, v in vars(cfg).items()
                                          if k.startswith("ppo_") or k in (
                                              "chemin_champion", "seed", "sub_step", "train2_frame_nb",
-                                             "coef_energie", "coef_hauteur", "poids_aleatoires")}},
+                                             "coef_energie", "coef_hauteur", "poids_aleatoires",
+                                             "physique_compilee")}},
     )
 
     # Tampons du rollout : [T, N, ...]
