@@ -630,9 +630,11 @@ project that survives both artefact tests. ≈ 8× the open-loop wave of E12.
 Each artefact removed made the gait less chattering, but it is still visibly jerky in
 video: commands still flip at nearly every decision.
 
-**Caveats.** (1) The diagnosis gives 291 mean displacement over 20 rollouts × 300
-frames, against 211 for PPO's own evaluation (500 rollouts) and 214 for a single
-`visualize.py` rollout; not yet explained — re-run with more rollouts. (2) A first
+**Caveats.** (1) ⚠️ The gait table above was measured by `diagnose_gait.py` with its
+`--v-max` defaulting to 20, i.e. *with* the clip this controller was trained without.
+That explains its 291 mean displacement against 211 for PPO's own evaluation and 214
+in `visualize.py`; the default is now ∞ and the E15 row must be re-measured (see E16).
+(2) A first
 diagnosis run defaulted to `sub_step = 10` (tool default, since fixed to 20) and is
 discarded; the E14 no-clip diagnosis that returned NaN had the same cause.
 
@@ -645,6 +647,37 @@ alternating ±0.4 every decision pays the same as one held at 0.4. Raising
 (`--coef-regularite`, off by default, same term for PPO and train2), PPO at
 λ ∈ {0.1, 1}; compare displacement (not reward, which now includes the penalty),
 |Δa| and video.
+
+---
+
+## E16 — Smoothness penalty: speed vs chattering
+
+**Date:** 2026/10/03 — **Status:** in progress (λ = 0.3 and a longer λ = 1 run pending).
+
+**Setup.** As E15 (clean physics: `sub_step = 20`, no clip) plus
+λ·Σ(a_t − a_{t−1})² on real muscles (`--coef-regularite`), PPO seed 0, 200 iterations.
+Gait measured with `tools/diagnose_gait.py --n 100` (v_max default fixed to ∞).
+
+| λ | displacement, 300 frames | mean \|Δa\| | mean \|a\| | saturated commands | nodes at \|v\| ≥ 20 |
+|---|---|---|---|---|---|
+| 0 (E15, re-measured) | 211 | 0.44 | 0.47 | 8.4% | 3.9% |
+| 0.1 | 197 | 0.39 | 0.43 | 4.9% | 2.9% |
+| 1 | 96 | **0.09** | 0.27 | 0.0% | 0.0% |
+
+The re-measured E15 row now agrees with PPO's own evaluation (211); its previous
+diagnosis (291) was run with the velocity clip on.
+
+**Reading.** λ = 0.1 costs 7% speed for a 12% drop in chattering — not worth it.
+λ = 1 cuts chattering by 5× (smooth commands, never saturated) at the price of half the
+speed — but its learning curve was still rising linearly at iteration 200, so part of
+that gap is under-training. The policy std also shrinks faster (0.118 vs 0.150): the
+penalty also charges exploration noise.
+
+**Hypothesis to test next.** Even the smooth controller is slow (96 vs ≈ 27 for the
+open-loop wave). The reference morphology was selected by evolution in the
+artefact-ridden physics (E12, E14) and may be poorly suited to real propulsion.
+Planned: λ = 1 for 400 iterations, λ = 0.3; then PPO with the chosen λ on 2–3 other
+morphologies.
 
 ---
 

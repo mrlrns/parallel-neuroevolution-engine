@@ -29,7 +29,7 @@ def moy(valeurs):
 
 
 @torch.no_grad()
-def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed, v_max=20.0):
+def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed, v_max=float("inf")):
     torch.manual_seed(seed)
     dev = torch.device("cpu")
     c = charger_champion(chemin, dev)
@@ -85,7 +85,8 @@ def main():
     p.add_argument("--coef-energie", type=float, default=10000.0)
     p.add_argument("--sub-step", type=int, default=20)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--v-max", type=float, default=20.0, help="écrêtage des vitesses (inf pour le retirer)")
+    p.add_argument("--v-max", type=float, default=float("inf"),
+                   help="écrêtage des vitesses ; défaut ∞ comme la config (20 pour les checkpoints ≤ E14)")
     a = p.parse_args()
 
     res = {ck: diagnostiquer(ck, a.n, a.frames, a.bruit, a.coef_energie, a.sub_step, a.seed, a.v_max) for ck in a.checkpoints}

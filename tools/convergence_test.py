@@ -45,7 +45,7 @@ def commande(nom, k, n_act, masque):
 
 
 @torch.no_grad()
-def simuler(champ, nom, sub_step, frames, n, seed, v_max=20.0):
+def simuler(champ, nom, sub_step, frames, n, seed, v_max=float("inf")):
     torch.manual_seed(seed)
     mega = MegaCrea(champ.dico, n, device="cpu")
     mega.v_max = v_max
@@ -82,7 +82,8 @@ def main():
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--sub-steps", type=int, nargs="+", default=[5, 10, 20, 40, 80])
-    p.add_argument("--v-max", type=float, default=20.0, help="écrêtage des vitesses (inf pour le retirer)")
+    p.add_argument("--v-max", type=float, default=float("inf"),
+                   help="écrêtage des vitesses ; défaut ∞ comme la config (20 = historique)")
     a = p.parse_args()
 
     champ = charger_champion(a.chemin_champion, torch.device("cpu"))
