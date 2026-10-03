@@ -8,7 +8,7 @@ from config import Config, build_argparser, charger_yaml, load_config
 def test_defaults_match_dataclass():
     cfg = Config()
     assert cfg.seed == 0
-    assert cfg.sub_step == 10
+    assert cfg.sub_step == 20  # E12 : 10 est instable
     assert cfg.frame_nb == 200
     assert cfg.chemin_champion is None
 

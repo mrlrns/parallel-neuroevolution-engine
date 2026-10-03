@@ -58,7 +58,7 @@ class Config:
     seed: int = 0
 
     # ---------- Simulation physique (commun à tous les scripts) ----------
-    sub_step: int = 10          # nb de sous-pas physiques par frame
+    sub_step: int = 20          # nb de sous-pas physiques par frame (10 est instable, cf. E12)
     frame_nb: int = 200         # nb de frames par épisode / par run
 
     # ---------- Phase 1 : train.py (évolution de la population) ----------

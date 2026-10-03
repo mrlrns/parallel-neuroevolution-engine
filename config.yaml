@@ -25,7 +25,7 @@ chemin_champion: null
 seed: 0
 
 # ---------- Simulation physique ----------
-sub_step: 10      # nombre de sous-pas physiques par frame
+sub_step: 20      # sous-pas physiques par frame ; 10 est numériquement instable (E12)
 frame_nb: 200     # nombre de frames par épisode
 
 # ---------- Phase 1 : train.py (évolution de la population) ----------

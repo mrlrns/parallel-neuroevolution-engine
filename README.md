@@ -2,12 +2,21 @@
 
 ![CI](https://github.com/mrlrns/parallel-neuroevolution-engine/actions/workflows/ci.yml/badge.svg)
 
-![Swimming gait](docs/swim.gif)
+## ⚠️ Status — results being re-established
 
-*Best swimming gait obtained so far (11 nodes, 16 links), 500 frames. This
-controller predates the fixes described below: its archived score is not
-reproducible and its performance is bimodal across initial conditions. The
-reproducible reference champion is `champion_raffine/reference.pt`.*
+A numerical convergence test (E12 in [EXPERIMENTS.md](EXPERIMENTS.md)) showed that the
+original integration step (`sub_step = 10`) is unstable: a creature **at rest** drifts
+forward, and learned controllers exploit the artefact — PPO with chattering
+bang-bang commands, gradient-based learning to a lesser extent. Physics converges from
+`sub_step = 20`, now the default, where a simple open-loop wave already swims.
+Controllers are being retrained in converged physics; numbers below this section
+predate the fix and are kept as a record.
+
+| open-loop command, reference morphology, 300 frames | sub_step 10 | 20 | 40 | 80 |
+|---|---|---|---|---|
+| rest (a = 0) | **23.4** | 0.0 | 0.0 | 0.0 |
+| slow travelling wave | 54.7 | 26.4 | 28.3 | 26.4 |
+| bang-bang | **228.8** | 30.5 | 32.1 | 22.8 |
 
 ## 🚀 Overview
 
@@ -15,18 +24,12 @@ This repository implements a custom, fully vectorized 2D physics engine built fr
 
 Instead of relying on standard loops or pre-built engines, this project leverages `torch.func.vmap` to achieve **massively parallel neural network evaluations**. By vectorizing both the physics simulation and the Brain (Multi-Layer Perceptron), the engine evaluates 50 morphologies × 30 concurrent rollouts in a single batched pass.
 
-## 📊 Current Status
+## 📊 Results so far (unstable integration regime, `sub_step = 10`)
 
-The creatures swim. The reference champion (9 nodes, 12 links) travels a mean of
-**577 units over 1000 frames** across 20 initial conditions, ranging from 156 to
-791, and its training score is reproducible on replay to within 1%.
-
-Remaining limitation: the reward telescopes to net displacement, so nothing yet
-requires sustained motion — behaviour degrades beyond the 300-frame training
-horizon. Next step is a reward on maintained velocity.
-
-In progress: a PPO baseline on the same frozen morphology, compared at equal
-simulation budget (see [Baseline comparison](#baseline-comparison-ppo) and E11).
+At equal simulation budget, PPO beat gradient-based learning through the simulator
+by ×15 in reward (E11, 3 seeds each) — a comparison that holds within that
+simulator, but whose displacements E12 showed to be largely numerical. Re-running E11
+at `sub_step = 20` is the next step.
 
 ## 🔬 How we got there
 
@@ -129,6 +132,7 @@ re-instantiated.
 | `baselines/check_env.py` | Proves `SwimEnv` reproduces the `train2.py` loop exactly — run before any baseline |
 | `baselines/ppo.py` | PPO baseline on the frozen morphology, same simulation budget as `train2.py` |
 | `baselines/compare.py` | Plots reward vs simulation budget, mean ± std over training seeds |
+| `tools/mp4_to_gif.py` | Converts a `visualize.py` video into the README GIF |
 | `EXPERIMENTS.md` | Experiment log: hypotheses, settings, outcomes — negative results kept |
 
 ## 🔧 Configuration
@@ -161,13 +165,13 @@ Each script exposes only the fields it actually uses, so `--help` stays readable
 pip install -r requirements.txt
 ```
 
-### Watch the reference champion
+### Watch the trained controllers
 
-A trained controller is included, so nothing has to be retrained to see the
-system work:
+The included controller was trained at `sub_step = 10` (see E12); replay it in the
+regime it was trained in:
 
 ```bash
-python visualize.py --chemin-champion champion_raffine/reference.pt --seed 19
+python visualize.py --chemin-champion champion_raffine/reference.pt --seed 19 --sub-step 10
 ```
 
 ### Running the Training

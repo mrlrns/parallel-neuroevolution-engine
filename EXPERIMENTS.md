@@ -338,6 +338,11 @@ as the README demonstration GIF, labelled as such.
 
 **Date:** 2026/09/29 – 2026/10/02 — **Status:** complete, 3 training seeds per method.
 
+> ⚠️ **Superseded by E12.** All runs here use `sub_step = 10`, which E12 shows to be
+> numerically unstable: the controllers, PPO's in particular, exploit integrator
+> artefacts. The comparison holds *within that simulator*; the displacements have no
+> physical meaning. E11 is kept unchanged as a record.
+
 **Question.** Does the gradient through the simulator buy anything over a
 standard model-free method, and at what budget does the advantage flip?
 
@@ -442,6 +447,82 @@ per episode, then a learning-rate sweep; (2) a learned critic V(s) bootstrapping
 return beyond each window (SHAC, Xu et al. 2022), so the gradient horizon stays short
 where analytic gradients are well-conditioned while the policy still optimises
 long-term return.
+
+---
+
+## E12 — The learned gaits exploit an integrator instability
+
+**Date:** 2026/10/03
+
+**Symptom.** In video, the PPO controller of E11 (seed 1, 3255 units / 1000 frames)
+moves forward with jerky, chattering muscle commands rather than an undulation.
+
+**Gait diagnosis** (`tools/diagnose_gait.py`, 20 rollouts × 300 frames, `sub_step = 10`).
+
+| | PPO seed 1 | reference | diffsim seed 1 |
+|---|---|---|---|
+| mean \|a\| | 0.41 | 0.72 | 0.25 |
+| mean \|Δa\| between decisions | **0.69** | 0.17 | 0.04 |
+| nodes at the ±20 velocity clip | **8.1%** | 3.9% | 4.4% |
+| vertical drift (units) | **73** | 0.7 | 0.2 |
+| energy penalty / progress | 0.08% | 0.5% | 0.7% |
+
+PPO's mean command jump exceeds its mean amplitude: commands flip sign at almost every
+decision. The energy penalty is negligible for every method, so nothing in the reward
+discourages chattering.
+
+**Transfer to finer integration** (`evaluate_seeds.py --sub-step`, 20 seeds × 1000
+frames; `dt = 1/sub_step`, the physical time per frame is unchanged).
+
+| controller | sub_step 10 | 20 | 40 |
+|---|---|---|---|
+| PPO seed 1 | 3255 | 17 | 17 |
+| reference | 577 | 36 | 36 |
+
+Both collapse, and 20 ≈ 40.
+
+**Open-loop convergence test** (`tools/convergence_test.py`, reference morphology,
+fixed commands, no learned controller, 8 rollouts × 300 frames).
+
+| command | sub_step 5 | 10 | 20 | 40 | 80 |
+|---|---|---|---|---|---|
+| rest (a = 0) | 3.1 | **23.4** | 0.0 | 0.0 | 0.0 |
+| slow travelling wave | 3.7 | 54.7 | 26.4 | 28.3 | 26.4 |
+| bang-bang, sign flip each decision | 5.1 | **228.8** | 30.5 | 32.1 | 22.8 |
+
+At `sub_step = 10` a creature **at rest** drifts 23 units with velocities hitting the
+±20 clip; from 20 upward it stays exactly still. A fixed wave converges to ≈ 27 from 20
+upward. A bang-bang command gets ×7–10 more displacement at 10 than in converged
+physics: that is the mechanism PPO found, and probably part of what evolution found
+for the reference.
+
+**Hypothesis for the mechanism (not yet verified).** Damping is explicit with
+`c = 2√k` per link (≈ 4.5 for a bone); a node attached to 2–3 links sees an effective
+`c·dt ≈ 1` at `dt = 0.1` — the stability limit of explicit damping, beyond which
+relative velocities overshoot and flip sign each sub-step instead of decaying.
+Combined with the asymmetric drag, the resulting numerical oscillation produces
+thrust. At `dt = 0.05`, `c·dt ≈ 0.5`.
+
+**Conclusion.** `sub_step = 10` is numerically unstable; every displacement reported
+in E0–E11 was obtained in that regime and is partly a numerical artefact, which
+learned controllers exploit — the more exploratory the method, the more so. The
+engine itself is sound: physics converges from `sub_step = 20`, and a naive open-loop
+wave already swims (≈ 27 units / 300 frames). Changes: `sub_step = 20` by default;
+the reference and E11 checkpoints are kept as records of the unstable regime. Next:
+retrain PPO and diffsim at `sub_step = 20` — a learned controller must beat the
+open-loop wave — and revisit the ±20 velocity clip, still active for violent
+commands at every resolution.
+
+---
+
+## E13 — Planned: per-window updates and full truncation (at `sub_step = 20`)
+
+Code in `train2.py` (opt-in): `--detachement-complet` and `--maj-par-fenetre`.
+The historical truncation detaches only `X, Y, vX, vY`: gradients still leak across
+window boundaries through observation → action and through `previous_distance`, so
+the "10-frame truncation" of E9–E11 was partial. Protocol: historical vs full
+truncation (1 update / episode) vs per-window updates (30 / episode), one variable at
+a time, in converged physics.
 
 ---
 
