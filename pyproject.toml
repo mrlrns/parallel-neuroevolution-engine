@@ -29,6 +29,7 @@ py-modules = [
     "brain",
     "individu",
     "megaVecto",
+    "megaVecto_fast",
     "logger",
     "config",
     "champion",
