@@ -83,6 +83,9 @@ class Config:
     learning_rate: float = 5e-5
     sauvegarde_tous_les: int = 25
     poids_aleatoires: bool = False  # True : ignore les poids du champion (comparaison de méthodes from scratch)
+    fenetre_bptt: int = 10          # longueur (frames) de la fenêtre de troncature du gradient, multiple de 5
+    maj_par_fenetre: bool = False   # E12 : une mise à jour Adam par fenêtre au lieu d'une par épisode
+    detachement_complet: bool = False  # E12 contrôle : troncature complète en mode une-màj-par-épisode
 
     # ---------- baselines/ppo.py (baseline PPO, même morphologie figée) ----------
     dossier_baselines: str = "baselines_out"
@@ -177,6 +180,9 @@ _AIDE = {
     "learning_rate": "Taux d'apprentissage (phase 2)",
     "sauvegarde_tous_les": "Sauvegarde un checkpoint tous les N épisodes (phase 2)",
     "poids_aleatoires": "Ignore les poids du champion et part d'un cerveau aléatoire",
+    "fenetre_bptt": "Longueur de la fenêtre de troncature du gradient (frames, multiple de 5)",
+    "maj_par_fenetre": "Une mise à jour de l'optimiseur par fenêtre de BPTT (E12) au lieu d'une par épisode",
+    "detachement_complet": "Coupe aussi les chemins obs→action et previous_distance aux frontières de fenêtre",
     "dossier_baselines": "Dossier de sortie des checkpoints des baselines",
     "ppo_nb_iterations": "Nombre d'itérations PPO (1 itération = 1 épisode sur tous les envs)",
     "ppo_n_envs": "Nombre d'environnements parallèles (PPO)",
@@ -218,7 +224,8 @@ _CHAMPS_PAR_SCRIPT = {
         "chemin_champion", "dossier_champion_raffine", "dossier_runs", "seed",
         "sub_step", "train2_frame_nb", "train2_batch_size", "nb_episodes",
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
-        "poids_aleatoires",
+        "poids_aleatoires", "fenetre_bptt", "maj_par_fenetre",
+        "detachement_complet",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
