@@ -107,7 +107,7 @@ def main():
             "coef_hauteur": COEF_HAUTEUR, "poids_aleatoires": cfg.poids_aleatoires,
             "fenetre_bptt": FENETRE, "maj_par_fenetre": cfg.maj_par_fenetre,
             "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee, "v_max": cfg.v_max,
-            "coef_regularite": cfg.coef_regularite,
+            "coef_regularite": cfg.coef_regularite, "water_drag": cfg.water_drag,
         },
     )
 
@@ -127,6 +127,7 @@ def main():
 
         mega = Physique(dico, BATCH_SIZE, device=device)
         mega.v_max = cfg.v_max
+        mega.water_drag = cfg.water_drag
         mega.coef_regularite = cfg.coef_regularite
         nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
         pos_depart = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n).detach().clone()

@@ -55,6 +55,8 @@ class MegaCrea:
         # et créait de la poussée exploitée par PPO (E14). Retiré par défaut ; les scripts
         # le fixent depuis la config (--v-max 20 pour rejouer les anciens checkpoints).
         self.v_max = float("inf")
+        # Coefficient de traînée de l'eau (normal ; tangentiel = 0.3 ×). 0.005 = valeur historique.
+        self.water_drag = 0.005
         # Pénalité de régularité λ·Σ(a_t − a_{t−1})² sur les vrais muscles (E16).
         # 0 par défaut : aucun calcul, comportement historique inchangé.
         self.coef_regularite = 0.0
@@ -113,7 +115,7 @@ class MegaCrea:
         normale_Y = dx / distances
         v_dot_normale = v_moyX * normale_X + v_moyY * normale_Y
 
-        water_drag = 0.005
+        water_drag = self.water_drag
         drag_factor = self.is_bone_exp + (1 - self.is_bone_exp) * 0.3
 
         f_trainee_X = -distances * v_dot_normale * normale_X * water_drag * drag_factor

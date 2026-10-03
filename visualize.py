@@ -94,6 +94,7 @@ def main():
 
     champion = MegaCrea(dico, batch_size=1, device=device)
     champion.v_max = cfg.v_max
+    champion.water_drag = cfg.water_drag
     print("X init:", champion.X[0, 0, :num_nodes_reel].tolist())
     print("X_base:", x)
     depart = champion.X[0, 0, :num_nodes_reel].mean().item()

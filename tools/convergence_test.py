@@ -45,10 +45,11 @@ def commande(nom, k, n_act, masque):
 
 
 @torch.no_grad()
-def simuler(champ, nom, sub_step, frames, n, seed, v_max=float("inf")):
+def simuler(champ, nom, sub_step, frames, n, seed, v_max=float("inf"), water_drag=0.005):
     torch.manual_seed(seed)
     mega = MegaCrea(champ.dico, n, device="cpu")
     mega.v_max = v_max
+    mega.water_drag = water_drag
     dt = torch.tensor(1.0 / sub_step)
     m = mega.mask_N_exp
     nb = m.sum(dim=2)
@@ -84,16 +85,21 @@ def main():
     p.add_argument("--sub-steps", type=int, nargs="+", default=[5, 10, 20, 40, 80])
     p.add_argument("--v-max", type=float, default=float("inf"),
                    help="écrêtage des vitesses ; défaut ∞ comme la config (20 = historique)")
+    p.add_argument("--water-drags", type=float, nargs="+", default=[0.005],
+                   help="coefficients de traînée à comparer (0.005 = historique)")
     a = p.parse_args()
 
     champ = charger_champion(a.chemin_champion, torch.device("cpu"))
     print(f"{a.chemin_champion} — {a.frames} frames, {a.n} rollouts, commandes en boucle ouverte, v_max={a.v_max}\n")
+    print("(water_drag balayé : " + ", ".join(str(w) for w in a.water_drags) + ")\n")
     print(f"{'commande':14s} {'sub_step':>8s} {'dt':>7s} {'ΔX':>10s} {'ΔY':>9s} {'|v| max':>8s} {'% à ±20':>8s} {'NaN':>5s}")
-    for nom in ("repos", "onde lente", "tout-ou-rien"):
-        for s in a.sub_steps:
-            dx, dy, vmax, sat, nb_nan = simuler(champ, nom, s, a.frames, a.n, a.seed, a.v_max)
-            print(f"{nom:14s} {s:8d} {1 / s:7.3f} {dx:10.2f} {dy:9.2f} {vmax:8.2f} {100 * sat:7.2f}% {nb_nan:3d}/{a.n}")
-        print()
+    for wd in a.water_drags:
+        print(f"--- water_drag = {wd}")
+        for nom in ("repos", "onde lente", "tout-ou-rien"):
+            for s in a.sub_steps:
+                dx, dy, vmax, sat, nb_nan = simuler(champ, nom, s, a.frames, a.n, a.seed, a.v_max, wd)
+                print(f"{nom:14s} {s:8d} {1 / s:7.3f} {dx:10.2f} {dy:9.2f} {vmax:8.2f} {100 * sat:7.2f}% {nb_nan:3d}/{a.n}")
+            print()
 
 
 if __name__ == "__main__":

@@ -84,7 +84,8 @@ def evaluer(agent, champ, cfg, device):
     env = SwimEnv(champ.dico, cfg.ppo_eval_n_envs, cfg.train2_frame_nb, cfg.sub_step,
                   cfg.coef_energie, cfg.coef_hauteur, device,
                   physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
-                  coef_regularite=cfg.coef_regularite)
+                  coef_regularite=cfg.coef_regularite,
+                  water_drag=cfg.water_drag)
     obs = env.reset()
     total = torch.zeros(env.n, device=device)
     done = False
@@ -106,7 +107,8 @@ def entrainer(cfg: Config):
     env = SwimEnv(champ.dico, cfg.ppo_n_envs, cfg.train2_frame_nb, cfg.sub_step,
                   cfg.coef_energie, cfg.coef_hauteur, device,
                   physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
-                  coef_regularite=cfg.coef_regularite)
+                  coef_regularite=cfg.coef_regularite,
+                  water_drag=cfg.water_drag)
     T, N = env.nb_decisions, env.n
     obs_size, act_size = champ.obs_size, champ.action_size
 
@@ -127,7 +129,7 @@ def entrainer(cfg: Config):
                                              "chemin_champion", "seed", "sub_step", "train2_frame_nb",
                                              "coef_energie", "coef_hauteur", "poids_aleatoires",
                                              "physique_compilee", "v_max",
-                                             "coef_regularite")}},
+                                             "coef_regularite", "water_drag")}},
     )
 
     # Tampons du rollout : [T, N, ...]

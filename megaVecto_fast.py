@@ -28,7 +28,6 @@ import torch
 
 from megaVecto import MegaCrea
 
-WATER_DRAG = 0.005
 FACTEUR_TANGENTIEL = 0.3
 def pas_physique(X, Y, vX, vY, D, A, target_length, stiff, c, kN, kT, mask_M, mask_N, masses, dt, v_max):
     """Un sous-pas de physique. Fonction pure : compilable par torch.compile."""
@@ -96,13 +95,15 @@ class MegaCreaFast(MegaCrea):
         self._A.scatter_add_(1, self.muscle2.unsqueeze(1), 0.5 * un)
 
         self._stiff = self.stiffness.unsqueeze(1).expand(-1, batch_size, -1)
-        facteur = self.is_bone_exp + (1 - self.is_bone_exp) * 0.3
-        self._kN = WATER_DRAG * facteur * self.mask_M_exp
-        self._kT = WATER_DRAG * FACTEUR_TANGENTIEL * facteur * self.mask_M_exp
+        # Traînée = water_drag × facteur os/muscle × masque ; water_drag lu à chaque
+        # sous-pas pour pouvoir être modifié après construction (comme v_max).
+        self._facteur_trainee = (self.is_bone_exp + (1 - self.is_bone_exp) * 0.3) * self.mask_M_exp
         self._pas = _pas_compile() if compile else pas_physique
 
     def apply_physics(self, dt):
         self.X, self.Y, self.vX, self.vY = self._pas(
             self.X, self.Y, self.vX, self.vY, self._D, self._A, self.target_length,
-            self._stiff, self.c, self._kN, self._kT, self.mask_M_exp, self.mask_N_exp, self.masses, dt,
+            self._stiff, self.c, self.water_drag * self._facteur_trainee,
+            self.water_drag * FACTEUR_TANGENTIEL * self._facteur_trainee,
+            self.mask_M_exp, self.mask_N_exp, self.masses, dt,
             self.v_max)

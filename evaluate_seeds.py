@@ -82,6 +82,7 @@ def main():
             torch.manual_seed(seed)
             c = MegaCrea(dico, batch_size=1, device=device)
             c.v_max = cfg.v_max
+            c.water_drag = cfg.water_drag
 
             depart = c.X[0, 0, :num_nodes_reel].mean().item()
             actions = []
