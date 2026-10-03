@@ -83,7 +83,7 @@ def main():
     p.add_argument("--frames", type=int, default=300)
     p.add_argument("--bruit", type=float, default=0.02)
     p.add_argument("--coef-energie", type=float, default=10000.0)
-    p.add_argument("--sub-step", type=int, default=10)
+    p.add_argument("--sub-step", type=int, default=20)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--v-max", type=float, default=20.0, help="écrêtage des vitesses (inf pour le retirer)")
     a = p.parse_args()

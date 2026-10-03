@@ -55,6 +55,11 @@ class MegaCrea:
         # et créait de la poussée exploitée par PPO (E14). Retiré par défaut ; les scripts
         # le fixent depuis la config (--v-max 20 pour rejouer les anciens checkpoints).
         self.v_max = float("inf")
+        # Pénalité de régularité λ·Σ(a_t − a_{t−1})² sur les vrais muscles (E16).
+        # 0 par défaut : aucun calcul, comportement historique inchangé.
+        self.coef_regularite = 0.0
+        self.action_prec = None
+        self.regularite = torch.zeros((self.X.shape[0], batch_size), device=device)
 
         self.energy = torch.zeros((self.X.shape[0], batch_size), device=device)
 
@@ -221,6 +226,12 @@ class MegaCrea:
         energy_step = torch.sum(torch.abs(new_lengths-base ) * self.mask_vrais_M_exp, dim=2)
         self.energy = self.energy + energy_step
 
+        if self.coef_regularite > 0.0:
+            if self.action_prec is not None:
+                saut = torch.sum(torch.square(action - self.action_prec) * self.mask_vrais_M_exp, dim=2)
+                self.regularite = self.regularite + saut
+            self.action_prec = action
+
 
     def get_reward(self, coeff_energie, coeff_hauteur):
       nb_nodes = torch.clamp(torch.sum(self.mask_N_exp, dim=2), min=1.0)
@@ -237,6 +248,9 @@ class MegaCrea:
           penalite_hauteur = torch.abs(hauteur_actuelle - self.previous_height) / coeff_hauteur
 
       reward = progres - penalite_energie - penalite_hauteur
+      if self.coef_regularite > 0.0:
+          reward = reward - self.coef_regularite * self.regularite
+          self.regularite = torch.zeros_like(self.regularite)
 
       self.previous_distance = distance_actuelle
       self.previous_height = hauteur_actuelle

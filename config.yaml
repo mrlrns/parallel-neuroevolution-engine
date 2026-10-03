@@ -27,6 +27,7 @@ seed: 0
 # ---------- Simulation physique ----------
 sub_step: 20      # sous-pas physiques par frame ; 10 est numériquement instable (E12)
 v_max: .inf       # écrêtage des vitesses retiré (créait de la poussée, E14) ; 20 = historique
+coef_regularite: 0.0   # E16 : pénalité λ·Σ(a_t − a_{t−1})² ; 0 = désactivée
 frame_nb: 200     # nombre de frames par épisode
 
 # ---------- Phase 1 : train.py (évolution de la population) ----------

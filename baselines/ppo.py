@@ -83,7 +83,8 @@ def evaluer(agent, champ, cfg, device):
     sur un env séparé : n'entre pas dans le budget `sim_steps`."""
     env = SwimEnv(champ.dico, cfg.ppo_eval_n_envs, cfg.train2_frame_nb, cfg.sub_step,
                   cfg.coef_energie, cfg.coef_hauteur, device,
-                  physique_compilee=cfg.physique_compilee, v_max=cfg.v_max)
+                  physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
+                  coef_regularite=cfg.coef_regularite)
     obs = env.reset()
     total = torch.zeros(env.n, device=device)
     done = False
@@ -104,7 +105,8 @@ def entrainer(cfg: Config):
     champ = charger_champion(cfg.chemin_champion, device)
     env = SwimEnv(champ.dico, cfg.ppo_n_envs, cfg.train2_frame_nb, cfg.sub_step,
                   cfg.coef_energie, cfg.coef_hauteur, device,
-                  physique_compilee=cfg.physique_compilee, v_max=cfg.v_max)
+                  physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
+                  coef_regularite=cfg.coef_regularite)
     T, N = env.nb_decisions, env.n
     obs_size, act_size = champ.obs_size, champ.action_size
 
@@ -124,7 +126,8 @@ def entrainer(cfg: Config):
                                          if k.startswith("ppo_") or k in (
                                              "chemin_champion", "seed", "sub_step", "train2_frame_nb",
                                              "coef_energie", "coef_hauteur", "poids_aleatoires",
-                                             "physique_compilee", "v_max")}},
+                                             "physique_compilee", "v_max",
+                                             "coef_regularite")}},
     )
 
     # Tampons du rollout : [T, N, ...]

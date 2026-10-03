@@ -594,6 +594,60 @@ artefact is left; then smoothness (E15).
 
 ---
 
+## E15 — PPO without the velocity clip: first artefact-free controller
+
+**Date:** 2026/10/03 — **Status:** 1 training seed.
+
+**Setup.** As E14 (`sub_step = 20`, 200 iterations, compiled physics) with the ±20
+velocity clip removed (`v_max = ∞`, new default). Checkpoint in `results/E15/`.
+
+**Learning curve.** Evaluation reward 4.5 → 211, flattening near 200–210 (E14 with
+the clip: 496). The first ~30 iterations are identical to E14 to the printed digit —
+same seed, and no node reaches 20 while the creature barely moves — and the two runs
+separate around iteration 40–50, exactly when the clip starts to bind. A built-in
+control for the E14 diagnosis.
+
+**Convergence check** (`evaluate_seeds.py`, 10 seeds × 1000 frames, no clip).
+
+| sub_step | 20 | 40 | 80 |
+|---|---|---|---|
+| mean displacement | 619 | 623 | 612 |
+
+Integrator-independent (2%), with no clip to lean on: the first controller of the
+project that survives both artefact tests. ≈ 8× the open-loop wave of E12.
+
+**Gait** (`tools/diagnose_gait.py`, `sub_step = 20`, 20 rollouts × 300 frames).
+
+| | E11 (unstable) | E14 (clip) | E15 |
+|---|---|---|---|
+| mean \|Δa\| between decisions | 0.69 | 0.53 | 0.42 |
+| mean \|a\| | 0.41 | 0.47 | 0.46 |
+| saturated commands | 0.7% | 12% | 7.6% |
+| nodes at \|v\| ≥ 20 | 8.1% | 4.9% | 1.9% |
+| vertical drift | 73 | 3.7 | −22 |
+| energy penalty / progress | 0.08% | 0.15% | 0.25% |
+
+Each artefact removed made the gait less chattering, but it is still visibly jerky in
+video: commands still flip at nearly every decision.
+
+**Caveats.** (1) The diagnosis gives 291 mean displacement over 20 rollouts × 300
+frames, against 211 for PPO's own evaluation (500 rollouts) and 214 for a single
+`visualize.py` rollout; not yet explained — re-run with more rollouts. (2) A first
+diagnosis run defaulted to `sub_step = 10` (tool default, since fixed to 20) and is
+discarded; the E14 no-clip diagnosis that returned NaN had the same cause.
+
+**Why the reward does not discourage chattering.** The energy term is
+Σ |new_length − rest_length|: it charges *amplitude*, not *change*. A muscle
+alternating ±0.4 every decision pays the same as one held at 0.4. Raising
+`coef_energie` would shrink contractions without smoothing them.
+
+**Next (E16).** Smoothness penalty λ·Σ(a_t − a_{t−1})² on real muscles
+(`--coef-regularite`, off by default, same term for PPO and train2), PPO at
+λ ∈ {0.1, 1}; compare displacement (not reward, which now includes the penalty),
+|Δa| and video.
+
+---
+
 ## Open questions
 
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to

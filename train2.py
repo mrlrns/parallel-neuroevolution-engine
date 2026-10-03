@@ -33,8 +33,11 @@ def detacher_etat(mega):
     previous_distance et previous_height gardent alors un lien avec la fenêtre
     précédente. En mise à jour par fenêtre, ce lien ferait rétropropager dans un
     graphe déjà libéré par backward(), il faut donc tout couper."""
-    for nom in ("X", "Y", "vX", "vY", "target_length", "previous_distance", "previous_height", "energy"):
-        setattr(mega, nom, getattr(mega, nom).detach())
+    for nom in ("X", "Y", "vX", "vY", "target_length", "previous_distance", "previous_height", "energy",
+                "regularite", "action_prec"):
+        val = getattr(mega, nom)
+        if torch.is_tensor(val):
+            setattr(mega, nom, val.detach())
 
 
 def main():
@@ -104,6 +107,7 @@ def main():
             "coef_hauteur": COEF_HAUTEUR, "poids_aleatoires": cfg.poids_aleatoires,
             "fenetre_bptt": FENETRE, "maj_par_fenetre": cfg.maj_par_fenetre,
             "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee, "v_max": cfg.v_max,
+            "coef_regularite": cfg.coef_regularite,
         },
     )
 
@@ -123,6 +127,7 @@ def main():
 
         mega = Physique(dico, BATCH_SIZE, device=device)
         mega.v_max = cfg.v_max
+        mega.coef_regularite = cfg.coef_regularite
         nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
         pos_depart = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n).detach().clone()
 
