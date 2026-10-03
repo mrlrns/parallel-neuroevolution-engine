@@ -281,6 +281,7 @@ def main():
 
         for episode in range(nb_episodes):
             mega = MegaCrea(dico, BATCH_SIZE, device=device)
+            mega.v_max = cfg.v_max
 
             rewards_accumulated = None
             explosion = False

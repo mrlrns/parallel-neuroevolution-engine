@@ -24,7 +24,7 @@ DECISION_TOUTES_LES = 5   # le cerveau est interrogé toutes les 5 frames (cf. t
 
 class SwimEnv:
     def __init__(self, dico, n_envs, frame_nb, sub_step, coef_energie, coef_hauteur, device,
-                 physique_compilee=False):
+                 physique_compilee=False, v_max=float("inf")):
         assert frame_nb % DECISION_TOUTES_LES == 0, "frame_nb doit être un multiple de 5"
         self.dico = dico
         self.n = n_envs
@@ -37,6 +37,7 @@ class SwimEnv:
         self.nb_decisions = frame_nb // DECISION_TOUTES_LES
         self.mega = None
         self._classe = classe_physique(physique_compilee)
+        self.v_max = v_max
         self.frame = 0
 
     @property
@@ -51,6 +52,7 @@ class SwimEnv:
     @torch.no_grad()
     def reset(self):
         self.mega = self._classe(self.dico, self.n, device=self.device)
+        self.mega.v_max = self.v_max
         self.frame = 0
         self.pos_depart = self.barycentre_x().clone()
         return self.mega.get_observation(0)[0]                        # [n, obs]

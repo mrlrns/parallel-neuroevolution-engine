@@ -6,7 +6,7 @@ evaluate_seeds.py), mesure :
   - |a|            amplitude moyenne des commandes (vrais muscles)
   - |Δa|           saut moyen de commande entre deux décisions (saccades)
   - saturation a   fraction des commandes à |a| > 0.95 (tout-ou-rien)
-  - sat. vitesse   fraction des nœuds dont la vitesse touche l'écrêtage ±20 de apply_physics
+  - sat. vitesse   fraction des nœuds à |v| ≥ 20 (seuil historique, même si --v-max diffère)
   - sat. longueur  fraction des muscles bloqués au plancher 0.3·base de apply_action
   - énergie / prog part de la récompense prise par la pénalité d'énergie
   - dérive Y       déplacement vertical du barycentre (question ouverte d'EXPERIMENTS)
@@ -29,7 +29,7 @@ def moy(valeurs):
 
 
 @torch.no_grad()
-def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed):
+def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed, v_max=20.0):
     torch.manual_seed(seed)
     dev = torch.device("cpu")
     c = charger_champion(chemin, dev)
@@ -39,6 +39,7 @@ def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed):
     env = SwimEnv(c.dico, n, frames, sub_step, coef_e, 0.0, dev)
     obs = env.reset()
     mega = env.mega
+    mega.v_max = v_max
     nb_n = mega.mask_N_exp.sum(dim=2)
     y0 = (mega.Y * mega.mask_N_exp).sum(dim=2) / nb_n
 
@@ -84,9 +85,10 @@ def main():
     p.add_argument("--coef-energie", type=float, default=10000.0)
     p.add_argument("--sub-step", type=int, default=10)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--v-max", type=float, default=20.0, help="écrêtage des vitesses (inf pour le retirer)")
     a = p.parse_args()
 
-    res = {ck: diagnostiquer(ck, a.n, a.frames, a.bruit, a.coef_energie, a.sub_step, a.seed) for ck in a.checkpoints}
+    res = {ck: diagnostiquer(ck, a.n, a.frames, a.bruit, a.coef_energie, a.sub_step, a.seed, a.v_max) for ck in a.checkpoints}
     noms = [ck.split("/")[-1] for ck in a.checkpoints]
     print(f"{'':20s}" + "".join(f"{n_:>26s}" for n_ in noms))
     for cle in next(iter(res.values())):

@@ -28,7 +28,7 @@ def _champion_et_cerveau():
 
 def test_swimenv_reproduces_train2_loop():
     champ, cerveau = _champion_et_cerveau()
-    ecart_depl, ecart_score, _ = comparer(champ.dico, cerveau, n=8, frame_nb=50, sub_step=10,
+    ecart_depl, ecart_score, _ = comparer(champ.dico, cerveau, n=8, frame_nb=50, sub_step=20,
                                           coef_e=10000.0, coef_h=0.0, bruit=0.02, seed=0,
                                           device=DEVICE)
     assert ecart_depl < 1e-3

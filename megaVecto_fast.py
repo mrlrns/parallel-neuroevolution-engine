@@ -30,10 +30,7 @@ from megaVecto import MegaCrea
 
 WATER_DRAG = 0.005
 FACTEUR_TANGENTIEL = 0.3
-V_MAX = 20.0
-
-
-def pas_physique(X, Y, vX, vY, D, A, target_length, stiff, c, kN, kT, mask_M, mask_N, masses, dt):
+def pas_physique(X, Y, vX, vY, D, A, target_length, stiff, c, kN, kT, mask_M, mask_N, masses, dt, v_max):
     """Un sous-pas de physique. Fonction pure : compilable par torch.compile."""
     S = torch.stack([X, Y, vX, vY], dim=2)                               # [P, B, 4, N]
     diff = torch.einsum("pbkn,pnm->pbkm", S, D)                          # x2 − x1 pour X, Y, vX, vY
@@ -60,8 +57,8 @@ def pas_physique(X, Y, vX, vY, D, A, target_length, stiff, c, kN, kT, mask_M, ma
     Fn = -torch.einsum("pbkm,pnm->pbkn", F_ax, D) + torch.einsum("pbkm,pnm->pbkn", F_tr, A)
     FX, FY = Fn.unbind(2)
 
-    vX = torch.clamp(vX + (FX / masses) * dt, -V_MAX, V_MAX) * mask_N
-    vY = torch.clamp(vY + (FY / masses) * dt, -V_MAX, V_MAX) * mask_N
+    vX = torch.clamp(vX + (FX / masses) * dt, -v_max, v_max) * mask_N
+    vY = torch.clamp(vY + (FY / masses) * dt, -v_max, v_max) * mask_N
     return X + vX * dt, Y + vY * dt, vX, vY
 
 
@@ -107,4 +104,5 @@ class MegaCreaFast(MegaCrea):
     def apply_physics(self, dt):
         self.X, self.Y, self.vX, self.vY = self._pas(
             self.X, self.Y, self.vX, self.vY, self._D, self._A, self.target_length,
-            self._stiff, self.c, self._kN, self._kT, self.mask_M_exp, self.mask_N_exp, self.masses, dt)
+            self._stiff, self.c, self._kN, self._kT, self.mask_M_exp, self.mask_N_exp, self.masses, dt,
+            self.v_max)

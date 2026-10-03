@@ -45,9 +45,10 @@ def commande(nom, k, n_act, masque):
 
 
 @torch.no_grad()
-def simuler(champ, nom, sub_step, frames, n, seed):
+def simuler(champ, nom, sub_step, frames, n, seed, v_max=20.0):
     torch.manual_seed(seed)
     mega = MegaCrea(champ.dico, n, device="cpu")
+    mega.v_max = v_max
     dt = torch.tensor(1.0 / sub_step)
     m = mega.mask_N_exp
     nb = m.sum(dim=2)
@@ -62,12 +63,16 @@ def simuler(champ, nom, sub_step, frames, n, seed):
         for _ in range(sub_step):
             mega.apply_physics(dt)
         v = torch.maximum(mega.vX.abs(), mega.vY.abs())[m.bool()]
-        vmax = max(vmax, v.max().item())
+        vmax = max(vmax, v.nan_to_num(nan=float('inf')).max().item())
         sat += (v >= 19.99).float().mean().item()
         pas += 1
     x1 = (mega.X * m).sum(dim=2) / nb
     y1 = (mega.Y * m).sum(dim=2) / nb
-    return (x1 - x0).mean().item(), (y1 - y0).mean().item(), vmax, sat / pas
+    nb_nan = int(torch.isnan(x1).sum().item())
+    dx = (x1 - x0)[~torch.isnan(x1)]
+    dy = (y1 - y0)[~torch.isnan(y1)]
+    moy = lambda t: t.mean().item() if t.numel() else float('nan')  # noqa: E731
+    return moy(dx), moy(dy), vmax, sat / pas, nb_nan
 
 
 def main():
@@ -77,15 +82,16 @@ def main():
     p.add_argument("--n", type=int, default=8)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--sub-steps", type=int, nargs="+", default=[5, 10, 20, 40, 80])
+    p.add_argument("--v-max", type=float, default=20.0, help="écrêtage des vitesses (inf pour le retirer)")
     a = p.parse_args()
 
     champ = charger_champion(a.chemin_champion, torch.device("cpu"))
-    print(f"{a.chemin_champion} — {a.frames} frames, {a.n} rollouts, commandes en boucle ouverte\n")
-    print(f"{'commande':14s} {'sub_step':>8s} {'dt':>7s} {'ΔX':>10s} {'ΔY':>9s} {'|v| max':>8s} {'% à ±20':>8s}")
+    print(f"{a.chemin_champion} — {a.frames} frames, {a.n} rollouts, commandes en boucle ouverte, v_max={a.v_max}\n")
+    print(f"{'commande':14s} {'sub_step':>8s} {'dt':>7s} {'ΔX':>10s} {'ΔY':>9s} {'|v| max':>8s} {'% à ±20':>8s} {'NaN':>5s}")
     for nom in ("repos", "onde lente", "tout-ou-rien"):
         for s in a.sub_steps:
-            dx, dy, vmax, sat = simuler(champ, nom, s, a.frames, a.n, a.seed)
-            print(f"{nom:14s} {s:8d} {1 / s:7.3f} {dx:10.2f} {dy:9.2f} {vmax:8.2f} {100 * sat:7.2f}%")
+            dx, dy, vmax, sat, nb_nan = simuler(champ, nom, s, a.frames, a.n, a.seed, a.v_max)
+            print(f"{nom:14s} {s:8d} {1 / s:7.3f} {dx:10.2f} {dy:9.2f} {vmax:8.2f} {100 * sat:7.2f}% {nb_nan:3d}/{a.n}")
         print()
 
 

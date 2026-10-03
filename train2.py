@@ -103,7 +103,7 @@ def main():
             "learning_rate": LEARNING_RATE, "coef_energie": COEF_ENERGIE,
             "coef_hauteur": COEF_HAUTEUR, "poids_aleatoires": cfg.poids_aleatoires,
             "fenetre_bptt": FENETRE, "maj_par_fenetre": cfg.maj_par_fenetre,
-            "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee,
+            "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee, "v_max": cfg.v_max,
         },
     )
 
@@ -122,6 +122,7 @@ def main():
     for episode in range(NB_EPISODES):
 
         mega = Physique(dico, BATCH_SIZE, device=device)
+        mega.v_max = cfg.v_max
         nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
         pos_depart = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n).detach().clone()
 

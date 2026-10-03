@@ -81,6 +81,7 @@ def main():
         for seed in range(NB_SEEDS):
             torch.manual_seed(seed)
             c = MegaCrea(dico, batch_size=1, device=device)
+            c.v_max = cfg.v_max
 
             depart = c.X[0, 0, :num_nodes_reel].mean().item()
             actions = []

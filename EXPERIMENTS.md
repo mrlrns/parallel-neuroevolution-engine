@@ -526,6 +526,74 @@ a time, in converged physics.
 
 ---
 
+## E14 — PPO in converged physics (`sub_step = 20`)
+
+**Date:** 2026/10/03 — **Status:** 1 training seed. Conclusion: this gait exploits the ±20
+velocity clip.
+
+**Setup.** As E11 (reference morphology, random initial controller, 2000 rollouts,
+300 frames), at `sub_step = 20`, 200 iterations, physics compiled
+(`--physique-compilee`, `MegaCreaFast` + `torch.compile`: ~13 min on a T4 instead of
+~45). Checkpoint in `results/E14/`.
+
+**Learning curve.** Evaluation reward 4.5 → 496 over 200 iterations, still rising.
+Compared with E11 seed 0 at `sub_step = 10` (28 → 734), learning stalls near 30–60
+for ~40 iterations before taking off: the numerical thrust of E12 was easy to find,
+real propulsion is not.
+
+**Convergence check** (`evaluate_seeds.py`, 10 seeds × 1000 frames).
+
+| sub_step | 20 | 40 | 80 |
+|---|---|---|---|
+| mean displacement | 1508 | 1535 | 1512 |
+
+Stable within 2%: unlike every controller of E0–E11, this gait is a property of the
+physics, not of the integrator. ≈ 19× the open-loop wave of E12 (≈ 27 / 300 frames),
+same speed over 300 and 1000 frames, vertical drift 3.7 (73 in E11).
+
+**Gait** (`tools/diagnose_gait.py`, `sub_step = 20`).
+
+| | PPO, E11 (unstable) | PPO, E14 |
+|---|---|---|
+| mean \|Δa\| between decisions | 0.69 | 0.53 |
+| mean \|a\| | 0.41 | 0.47 |
+| saturated commands (\|a\| > 0.95) | 0.7% | 12% |
+| nodes at the ±20 velocity clip | 8.1% | 4.9% |
+| energy penalty / progress | 0.08% | 0.15% |
+
+Real but still chattering: commands still flip at almost every decision, and the
+energy penalty is negligible, so nothing in the reward discourages it.
+
+**Velocity-clip test.** `apply_physics` clamps every node velocity to ±20 — a
+safeguard from the unstable-integrator era, with no physical meaning. Same controller,
+no retraining, clip varied (`evaluate_seeds.py --v-max`, 10 seeds × 1000 frames,
+`sub_step = 20`):
+
+| v_max | 20 | 40 | ∞ |
+|---|---|---|---|
+| PPO mean displacement | 1508 | 81 | 81 |
+
+Open-loop control (`tools/convergence_test.py --v-max inf`, 8 rollouts × 300 frames):
+no rollout diverges for any command or step size — the physics does **not** need the
+clip to stay stable. But the clip itself produces thrust: the bang-bang command
+travels ≈ 23–32 with the clip, ≈ 11–18 without it (peak node speed 38–45). A clamped
+node discards part of the impulse it receives, so a link no longer pushes its two
+ends symmetrically: momentum is not conserved, and the asymmetry becomes net motion.
+
+**Conclusion.** The E14 gait is integrator-independent but rides on the velocity
+clip: removing it divides displacement by ~18. Part of the drop is distribution shift
+(velocities > 20 never seen in training), but the open-loop control shows the clip
+alone roughly doubles bang-bang thrust. Second simulator artefact found by RL after
+E12 — the more an optimiser explores, the more it finds what the simulator gets
+wrong. Changes: `v_max = ∞` by default (configurable everywhere; use `--v-max 20
+--sub-step 10` to replay checkpoints from E0–E11). Side confirmation of E12: with the
+clip removed, `sub_step = 10` diverges to NaN within 50 frames (`tests/test_env.py`
+had to move to `sub_step = 20`) — the clip had been hiding the instability. Next: retrain PPO without the clip
+and rerun the same checks (step-size convergence, gait diagnosis, video) until no
+artefact is left; then smoothness (E15).
+
+---
+
 ## Open questions
 
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to

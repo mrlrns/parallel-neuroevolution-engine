@@ -51,6 +51,10 @@ class MegaCrea:
 
         self.c = 2 * torch.sqrt(self.stiffness).unsqueeze(1).expand(-1, batch_size, -1)
         self.masses = torch.ones_like(self.X)
+        # Écrêtage des vitesses : non physique, il effaçait de la quantité de mouvement
+        # et créait de la poussée exploitée par PPO (E14). Retiré par défaut ; les scripts
+        # le fixent depuis la config (--v-max 20 pour rejouer les anciens checkpoints).
+        self.v_max = float("inf")
 
         self.energy = torch.zeros((self.X.shape[0], batch_size), device=device)
 
@@ -137,8 +141,8 @@ class MegaCrea:
         forces_noeuds_Y.scatter_add_(2, m2_exp, -fx_totaleY + f_trainee_Y / 2)
 
         # --- ÉTAPE 6 : INTÉGRATION & MASQUE NOEUDS ---
-        self.vX = torch.clamp(self.vX + (forces_noeuds_X / self.masses) * dt, -20, 20)
-        self.vY = torch.clamp(self.vY + (forces_noeuds_Y / self.masses) * dt, -20, 20)
+        self.vX = torch.clamp(self.vX + (forces_noeuds_X / self.masses) * dt, -self.v_max, self.v_max)
+        self.vY = torch.clamp(self.vY + (forces_noeuds_Y / self.masses) * dt, -self.v_max, self.v_max)
 
         # Les fantômes restent immobiles
         self.vX = self.vX * self.mask_N_exp

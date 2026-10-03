@@ -59,6 +59,7 @@ class Config:
 
     # ---------- Simulation physique (commun à tous les scripts) ----------
     sub_step: int = 20          # nb de sous-pas physiques par frame (10 est instable, cf. E12)
+    v_max: float = float("inf")  # écrêtage des vitesses : retiré (créait de la poussée, cf. E14) ; 20 = historique
     frame_nb: int = 200         # nb de frames par épisode / par run
 
     # ---------- Phase 1 : train.py (évolution de la population) ----------
@@ -208,6 +209,7 @@ _AIDE = {
     "nom_video": "Nom du fichier vidéo de sortie",
     "nb_seeds": "Nombre de seeds testées (test.py)",
     "nb_frames_test": "Nombre de frames par seed testée (test.py)",
+    "v_max": "Écrêtage des vitesses des nœuds (inf pour le retirer)",
     "bruit_test": "Écart-type du bruit d'action pendant le test",
     "nb_repetitions": "Nombre de répétitions de l'évaluation (test2.py)",
 }
@@ -220,14 +222,14 @@ _CHAMPS_PAR_SCRIPT = {
         "batch_size", "max_noeuds_fixe", "max_muscles_fixe", "pop_size",
         "nb_generations", "lr", "rate_new_node", "rate_mut_length",
         "rate_change_bone", "rate_pop_node", "coef_energie", "coef_hauteur",
-        "bruit_action",
+        "bruit_action", "v_max",
     ],
     "train2": [
         "chemin_champion", "dossier_champion_raffine", "dossier_runs", "seed",
         "sub_step", "train2_frame_nb", "train2_batch_size", "nb_episodes",
         "learning_rate", "coef_energie", "coef_hauteur", "sauvegarde_tous_les",
         "poids_aleatoires", "fenetre_bptt", "maj_par_fenetre",
-        "detachement_complet", "physique_compilee",
+        "detachement_complet", "physique_compilee", "v_max",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
@@ -235,23 +237,23 @@ _CHAMPS_PAR_SCRIPT = {
         "ppo_nb_iterations", "ppo_n_envs", "ppo_lr", "ppo_gamma", "ppo_gae_lambda",
         "ppo_clip", "ppo_epochs", "ppo_minibatches", "ppo_ent_coef", "ppo_vf_coef",
         "ppo_max_grad_norm", "ppo_std_init", "ppo_eval_tous_les", "ppo_eval_n_envs",
-        "physique_compilee",
+        "physique_compilee", "v_max",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",
-        "coef_energie", "coef_hauteur", "bruit_action",
+        "coef_energie", "coef_hauteur", "bruit_action", "v_max",
     ],
     "visualize": [
         "chemin_champion", "dossier_videos", "seed", "sub_step",
         "largeur_ecran", "hauteur_ecran", "fps_video",
-        "nb_frames_visualisation", "bruit_visualisation", "nom_video",
+        "nb_frames_visualisation", "bruit_visualisation", "nom_video", "v_max",
     ],
     "test": [
-        "chemin_champion", "sub_step", "nb_seeds", "nb_frames_test", "bruit_test",
+        "chemin_champion", "sub_step", "nb_seeds", "nb_frames_test", "bruit_test", "v_max",
     ],
     "test2": [
         "chemin_champion", "sub_step", "batch_size", "frame_nb",
-        "coef_energie", "coef_hauteur", "bruit_action", "nb_repetitions",
+        "coef_energie", "coef_hauteur", "bruit_action", "nb_repetitions", "v_max",
     ],
 }
 

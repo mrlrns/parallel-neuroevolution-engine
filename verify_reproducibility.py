@@ -99,6 +99,7 @@ def main():
         for rep in range(NB_REPETITIONS):
             torch.manual_seed(rep)
             mega = MegaCrea(dico, BATCH_SIZE, device=device)
+            mega.v_max = cfg.v_max
 
             nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
             depart = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n).clone()

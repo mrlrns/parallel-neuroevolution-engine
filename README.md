@@ -9,8 +9,10 @@ original integration step (`sub_step = 10`) is unstable: a creature **at rest** 
 forward, and learned controllers exploit the artefact — PPO with chattering
 bang-bang commands, gradient-based learning to a lesser extent. Physics converges from
 `sub_step = 20`, now the default, where a simple open-loop wave already swims.
-Controllers are being retrained in converged physics; numbers below this section
-predate the fix and are kept as a record.
+A second test (E14) showed that the ±20 node-velocity clip also produced thrust —
+PPO's next gait relied on it — so it is removed by default (the physics is stable
+without it). Controllers are being retrained; numbers below this section predate
+these fixes and are kept as a record.
 
 | open-loop command, reference morphology, 300 frames | sub_step 10 | 20 | 40 | 80 |
 |---|---|---|---|---|
@@ -167,11 +169,11 @@ pip install -r requirements.txt
 
 ### Watch the trained controllers
 
-The included controller was trained at `sub_step = 10` (see E12); replay it in the
-regime it was trained in:
+The included controller was trained at `sub_step = 10` with the ±20 velocity clip
+(see E12, E14); replay it in the regime it was trained in:
 
 ```bash
-python visualize.py --chemin-champion champion_raffine/reference.pt --seed 19 --sub-step 10
+python visualize.py --chemin-champion champion_raffine/reference.pt --seed 19 --sub-step 10 --v-max 20
 ```
 
 ### Running the Training
