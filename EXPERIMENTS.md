@@ -652,32 +652,135 @@ alternating ±0.4 every decision pays the same as one held at 0.4. Raising
 
 ## E16 — Smoothness penalty: speed vs chattering
 
-**Date:** 2026/10/03 — **Status:** in progress (λ = 0.3 and a longer λ = 1 run pending).
+**Date:** 2026/10/03 — **Status:** complete, 1 training seed per λ. **Chosen: λ = 1, 400 iterations.**
 
 **Setup.** As E15 (clean physics: `sub_step = 20`, no clip) plus
-λ·Σ(a_t − a_{t−1})² on real muscles (`--coef-regularite`), PPO seed 0, 200 iterations.
-Gait measured with `tools/diagnose_gait.py --n 100` (v_max default fixed to ∞).
+λ·Σ(a_t − a_{t−1})² on real muscles (`--coef-regularite`), PPO seed 0, 200 iterations
+unless stated. Gait measured with `tools/diagnose_gait.py --n 100` (v_max default fixed to ∞).
 
-| λ | displacement, 300 frames | mean \|Δa\| | mean \|a\| | saturated commands | nodes at \|v\| ≥ 20 |
-|---|---|---|---|---|---|
-| 0 (E15, re-measured) | 211 | 0.44 | 0.47 | 8.4% | 3.9% |
-| 0.1 | 197 | 0.39 | 0.43 | 4.9% | 2.9% |
-| 1 | 96 | **0.09** | 0.27 | 0.0% | 0.0% |
+| λ | iterations | displacement, 300 frames | mean \|Δa\| | mean \|a\| | saturated commands | nodes at \|v\| ≥ 20 |
+|---|---|---|---|---|---|---|
+| 0 (E15, re-measured) | 200 | 211 | 0.44 | 0.47 | 8.4% | 3.9% |
+| 0.1 | 200 | 197 | 0.39 | 0.43 | 4.9% | 2.9% |
+| 0.3 | 200 | 173 | 0.32 | — | — | — |
+| 1 | 200 | 96 | **0.09** | 0.27 | 0.0% | 0.0% |
+| **1** | **400** | **132** | 0.13 | — | — | — |
 
 The re-measured E15 row now agrees with PPO's own evaluation (211); its previous
 diagnosis (291) was run with the velocity clip on.
 
-**Reading.** λ = 0.1 costs 7% speed for a 12% drop in chattering — not worth it.
-λ = 1 cuts chattering by 5× (smooth commands, never saturated) at the price of half the
-speed — but its learning curve was still rising linearly at iteration 200, so part of
-that gap is under-training. The policy std also shrinks faster (0.118 vs 0.150): the
-penalty also charges exploration noise.
+**Reading.** Speed and smoothness trade off monotonically. λ = 0.1 costs 7% speed for a
+12% drop in chattering — not worth it. λ = 1 cuts chattering by 5× (smooth commands,
+never saturated); doubling its training (200 → 400 iterations) recovers +38% displacement
+(96 → 132) for a modest rise in |Δa| (0.09 → 0.13), so most of the λ = 1 gap at 200
+iterations was under-training. λ = 0.3 was only trained 200 iterations and is not
+directly comparable to the 400-iteration λ = 1 run. The policy std also shrinks faster
+under the penalty (0.118 vs 0.150 at λ = 1): the penalty also charges exploration noise.
 
-**Hypothesis to test next.** Even the smooth controller is slow (96 vs ≈ 27 for the
-open-loop wave). The reference morphology was selected by evolution in the
-artefact-ridden physics (E12, E14) and may be poorly suited to real propulsion.
-Planned: λ = 1 for 400 iterations, λ = 0.3; then PPO with the chosen λ on 2–3 other
-morphologies.
+**Reproducibility note.** With `MegaCreaFast` (incidence-matrix einsums instead of
+`scatter_add_` atomics) GPU reruns are bit-identical, which made one apparent result
+(λ = 1 long identical to λ = 1 short) traceable to a mislabelled download rather than to
+the training.
+
+**Lost run.** The first λ = 1 long run was written to the Colab VM's local disk because
+Drive was not mounted; from E17 on, the Colab training cells `assert os.path.ismount("/content/drive")`
+before training and call `drive.flush_and_unmount()` after.
+
+**Open hypothesis after E16.** Even the chosen controller is slow (≈ 0.66 body lengths
+in 300 frames). Two candidate causes: the reference morphology (selected by evolution in
+the artefact-ridden physics of E12/E14, with a weak learner) or the physics itself
+(water drag 0.005 too low). Tested in E17.
+
+---
+
+## E17 — Control morphology: an eel in the same physics
+
+**Date:** 2026/10/04 — **Status:** complete, open-loop sweep + 1 PPO seed.
+
+**Question.** Is the slow swimming due to the reference morphology or to the physics?
+A control body whose swimming strategy is known from real fish (anguilliform: a wave
+travelling head → tail) is built from the same parts (nodes, bones, muscles) and run in
+the same `SwimEnv`.
+
+**Body** (`tools/eel_control.py`, saved as `champion_raffine/anguille.pt`, Brain-compatible).
+A ladder of 8 vertebrae, length 210 (reference: 200), thickness 10: bone rungs and bone
+diagonals, active muscles on the top and bottom edges in antagonism. 16 nodes, 29 links,
+so it fits the same `max_noeuds = 20` / `max_muscles = 30` padding and runs through
+`baselines/ppo.py` unchanged.
+
+**1. Open-loop wave** (haut_k = A·sin(2πt/T + kφ), bas_k = −haut_k; 120 waves swept over
+amplitude, period and wavelength, both directions; 300 frames, `sub_step = 20`).
+
+| water_drag | best eel wave | reference + PPO λ=1 (trained at 0.005) |
+|---|---|---|
+| 0.005 | 13.9 (0.07 LC) | 136 (0.68 LC) |
+| 0.02 | 21.6 (0.10 LC) | 37 (0.18 LC) |
+| 0.05 | 25.7 (0.12 LC) | 19 (0.09 LC) |
+
+(LC = body lengths. The reference controller is replayed off-policy at higher drag:
+indicative only.) The rest command gives exactly 0 at every drag.
+
+The open-loop result is **not** a valid measure of the eel. The best waves use the
+maximum amplitude A = 1.0, at which each segment is commanded to bend ≈ 2 rad: the GIF
+(`docs/eel.gif`) shows the body folding onto itself (length 210 → ≈ 100), and reversing
+the wave does not reverse the motion (−6 instead of −14). At reasonable amplitudes
+(A = 0.2–0.4) the body does form a clean travelling wave of ≈ 10–15 units amplitude but
+moves only 10–15 units, with an inconsistent direction. Raising drag suppresses bending
+(lateral amplitude ÷5 at 0.05, near zero at 0.5): with muscle stiffness 1 against bone
+stiffness 5, the muscles cannot bend a slender body against water that grips it.
+
+**2. PPO on the eel** (λ = 1, 400 iterations, seed 0, random init, drag 0.005; same
+command as E16 λ = 1 long). Evaluation reward still slowly rising at the end (29.0).
+
+| | displacement, 300 frames | LC | mean \|Δa\| | vertical drift |
+|---|---|---|---|---|
+| eel, best open-loop wave | ≈ 14 | 0.07 | — | — |
+| **eel + PPO λ = 1** | **39** | **0.19** | 0.08 | 17 |
+| reference + PPO λ = 1 (E16) | 132 | 0.66 | 0.13 | — |
+
+**Reading.**
+1. My open-loop wave was sub-optimal: PPO finds a gait ≈ 2.8× faster on the same body.
+2. But a learned eel is still ≈ 3.4× slower per body length than the reference.
+3. This is not a badly built eel: the simulator's building blocks cannot express
+   anguilliform swimming.
+   - **No skin.** Water acts only on links, and muscles feel 0.3× the drag of bones, so a
+     body whose outline is made of muscles is nearly transparent to the water. (Setting
+     muscle drag to 1 in the numpy re-implementation did not fix it.)
+   - **Weak muscles.** A muscle is a stiffness-1 spring (bones: 5) whose rest length moves
+     by at most ±30%: in light water (0.005) a slender body bends but finds no grip; in
+     heavy water it grips but can no longer bend.
+   - **No reactive forces.** Drag is linear and purely resistive. Real fish get most of
+     their thrust from accelerating water backwards (added mass), which is absent here.
+   - **No real joints.** Links connect only at nodes: a muscle cannot insert in the middle
+     of a rigid bone without splitting it into two bones, which creates a free hinge
+     unless it is braced by extra links (within the 20-node / 30-link budget). Lever-arm
+     joints as in vertebrates are not representable.
+4. Recreating real animals is therefore not a meaningful target for this simulator, and
+   the creatures should be read as adapted to their simulated world (as in Sims, 1994),
+   not as models of real swimmers.
+5. The eel's vertical drift (17 for 39 forward) is large: part of its displacement may be
+   a diagonal drift rather than swimming (see Open questions).
+
+**Caveats.** One PPO seed, curve not fully flat at 400 iterations; one eel design
+(variants with thickness 6–20, passive or bone diagonals and 8 or 12 vertebrae gave the
+same open-loop picture, in a numpy re-implementation of the physics checked against
+the PPO checkpoints: 134.7 vs 132.4 and 207 vs 211).
+
+**What E17 does NOT establish.**
+- *Whether the reference morphology is good.* The eel was meant as a positive control
+  (a body known to swim well); since this physics cannot express its strategy, beating it
+  says nothing about how the reference compares with the bodies the simulator *can*
+  build. The morphology question must be answered with morphologies from the same
+  generator (`train.py`'s `generer_topologie` / `elite_mutant/`) trained with the same
+  PPO λ = 1 protocol.
+- *Whether more drag would help.* The open-loop eel numbers at higher drag come from the
+  folding artefact, and the reference controller was replayed off-policy (trained at
+  0.005). A valid test retrains PPO at each drag. Not run: changing drag changes the
+  physics, and the physics is frozen for now.
+
+**Decision.** The physics stays as is (`sub_step = 20`, no clip, water_drag = 0.005).
+Next: the method comparison (train2 vs PPO, 3 seeds) in this physics with the final
+reward (λ = 1); the in-family morphology test is optional.
 
 ---
 
