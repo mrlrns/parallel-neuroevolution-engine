@@ -15,3 +15,6 @@ baselines_out/
 *.mp4
 videos/
 videos_ia*/
+# Environnement Linux de Claude (wheels hors-ligne + venv)
+.vm_wheels/
+.vm_venv/
