@@ -515,14 +515,37 @@ commands at every resolution.
 
 ---
 
-## E13 — Planned: per-window updates and full truncation (at `sub_step = 20`)
+## E13 — train2 variants: per-window updates and full truncation (at `sub_step = 20`)
+
+**Date:** 2026/10/22 — **Status:** pilot complete (1 seed, 100 episodes per variant).
 
 Code in `train2.py` (opt-in): `--detachement-complet` and `--maj-par-fenetre`.
 The historical truncation detaches only `X, Y, vX, vY`: gradients still leak across
 window boundaries through observation → action and through `previous_distance`, so
-the "10-frame truncation" of E9–E11 was partial. Protocol: historical vs full
-truncation (1 update / episode) vs per-window updates (30 / episode), one variable at
-a time, in converged physics.
+the "10-frame truncation" of E9–E11 was partial.
+
+**Setup.** Clean physics (`sub_step = 20`, no clip), final reward of E16 (λ = 1),
+random init, seed 0, 100 episodes = same simulation budget per variant, compiled
+physics, Colab GPU (`colab/E18_clean_comparison.ipynb`, part A). One variable at a time.
+
+| variant | updates / episode | training distance, mean of last 10 episodes |
+|---|---|---|
+| `hist` (historical partial truncation) | 1 | 11.6 |
+| `complet` (full truncation) | 1 | 13.8 |
+| `fenetre` (full truncation + per-window Adam step) | 30 | **62.5** |
+
+(The "start" distance printed by the notebook averages the first 5 episodes, i.e. after
+up to 150 updates for `fenetre` against 5 for the others: it is not a common starting
+point, all three start from the same random policy.)
+
+**Reading.** Closing the gradient leak alone changes little (+19%, within what one seed
+can tell). Updating after every window instead of once per episode is the decisive
+change: ×4.5 at equal simulation budget. With one update per episode, train2 spends
+6000 physics sub-steps × 2000 rollouts per gradient step; PPO makes many minibatch steps
+per rollout batch. Part of E11's gap between the two methods was therefore an
+update-frequency gap, not a property of gradients through the simulator.
+
+**Decision.** `--maj-par-fenetre` is the train2 variant used in E18.
 
 ---
 
