@@ -5,6 +5,7 @@ __pycache__/
 # Sorties d'entraînement
 *.pt
 !champion_raffine/reference.pt
+!champion_raffine/rameur.pt
 elite_mutant/
 mutants_d_elite/
 runs/

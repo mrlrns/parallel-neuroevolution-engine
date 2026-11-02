@@ -1,0 +1,20 @@
+Device utilisé : cuda
+Acteur initialisé aléatoirement
+It.    0 | score (stochastique)    -4.08 | éval    -6.01 | distance    6.06 | kl 0.0072 | std 0.200
+It.   10 | score (stochastique)    20.57 | éval     4.34 | distance   30.77 | kl 0.0065 | std 0.200
+It.   20 | score (stochastique)    31.70 | éval    31.02 | distance   41.26 | kl 0.0079 | std 0.195
+It.   30 | score (stochastique)    41.66 | éval    41.94 | distance   50.44 | kl 0.0062 | std 0.189
+It.   40 | score (stochastique)    47.88 | éval    50.65 | distance   56.04 | kl 0.0065 | std 0.183
+It.   50 | score (stochastique)    54.08 | éval    54.22 | distance   62.00 | kl 0.0068 | std 0.178
+It.   60 | score (stochastique)    61.89 | éval    63.52 | distance   70.21 | kl 0.0060 | std 0.174
+It.   70 | score (stochastique)    72.08 | éval    81.61 | distance   81.09 | kl 0.0073 | std 0.171
+It.   80 | score (stochastique)    81.23 | éval    91.12 | distance   90.95 | kl 0.0071 | std 0.167
+It.   90 | score (stochastique)    89.65 | éval   100.02 | distance   99.77 | kl 0.0072 | std 0.164
+It.  100 | score (stochastique)    98.16 | éval   109.03 | distance  108.92 | kl 0.0077 | std 0.160
+It.  110 | score (stochastique)   105.94 | éval   116.62 | distance  117.05 | kl 0.0065 | std 0.157
+It.  120 | score (stochastique)   112.75 | éval   121.35 | distance  124.25 | kl 0.0073 | std 0.155
+It.  130 | score (stochastique)   120.36 | éval   127.82 | distance  132.42 | kl 0.0070 | std 0.153
+It.  140 | score (stochastique)   127.89 | éval   134.47 | distance  140.49 | kl 0.0073 | std 0.151
+
+🏆 Meilleur score d'évaluation : 140.44
+💾 /content/drive/MyDrive/watercrea/E18b/ppo/ppo_seed1_best.pt  (format Brain : passe dans evaluate_seeds.py)

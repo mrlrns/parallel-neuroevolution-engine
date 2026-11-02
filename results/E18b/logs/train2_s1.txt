@@ -1,0 +1,23 @@
+Device utilisé : cuda
+✅ Champion chargé depuis champion_raffine/reference.pt
+   Topologie : 9 noeuds, 12 liens (7 muscles, 5 os)
+   Padding d'origine : max_noeuds=11, max_muscles=14
+   Cerveau RÉINITIALISÉ (poids aléatoires) — comparaison de méthodes
+Ép.    0 | moyenne:    -4.87 | écart-type:     0.71 | 30 màj, norme moy 21.32 | distance moy:   -4.52 | bruit: 0.0300
+Ép.   10 | moyenne:    18.65 | écart-type:     1.54 | 30 màj, norme moy 8.35 | distance moy:   19.13 | bruit: 0.0280
+Ép.   20 | moyenne:    33.05 | écart-type:     2.37 | 30 màj, norme moy 7.21 | distance moy:   34.10 | bruit: 0.0260
+Ép.   30 | moyenne:    42.16 | écart-type:     3.77 | 30 màj, norme moy 5.66 | distance moy:   43.23 | bruit: 0.0240
+Ép.   40 | moyenne:    44.13 | écart-type:     7.82 | 30 màj, norme moy 5.75 | distance moy:   45.12 | bruit: 0.0220
+Ép.   50 | moyenne:    50.47 | écart-type:     5.06 | 30 màj, norme moy 4.64 | distance moy:   51.55 | bruit: 0.0200
+Ép.   60 | moyenne:    52.18 | écart-type:     3.80 | 30 màj, norme moy 3.98 | distance moy:   53.30 | bruit: 0.0180
+Ép.   70 | moyenne:    52.94 | écart-type:     4.17 | 30 màj, norme moy 3.99 | distance moy:   54.15 | bruit: 0.0160
+Ép.   80 | moyenne:    57.38 | écart-type:     4.71 | 30 màj, norme moy 5.41 | distance moy:   59.09 | bruit: 0.0140
+Ép.   90 | moyenne:    57.12 | écart-type:     4.87 | 30 màj, norme moy 4.03 | distance moy:   59.65 | bruit: 0.0120
+Ép.  100 | moyenne:    58.52 | écart-type:     3.24 | 30 màj, norme moy 4.12 | distance moy:   61.53 | bruit: 0.0100
+Ép.  110 | moyenne:    58.57 | écart-type:     3.99 | 30 màj, norme moy 3.59 | distance moy:   61.97 | bruit: 0.0080
+Ép.  120 | moyenne:    57.94 | écart-type:     3.38 | 30 màj, norme moy 3.01 | distance moy:   61.72 | bruit: 0.0060
+Ép.  130 | moyenne:    57.90 | écart-type:     3.31 | 30 màj, norme moy 2.69 | distance moy:   61.99 | bruit: 0.0050
+Ép.  140 | moyenne:    57.87 | écart-type:     3.37 | 30 màj, norme moy 2.48 | distance moy:   62.24 | bruit: 0.0050
+
+🏆 Terminé — meilleur score : 58.80
+💾 Sauvegardé dans /content/drive/MyDrive/watercrea/E18b/diffsim/FINAL_seed1_score_58.8.pt

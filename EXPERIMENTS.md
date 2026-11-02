@@ -931,6 +931,77 @@ lower-gain output (`tanh(x/2)`), or action noise injected before the tanh.
 
 ---
 
+## E18b — Same comparison at λ = 0.3
+
+**Date:** 2026/11/03 — **Status:** complete, 3 training seeds per method (rower and eel
+runs pending).
+
+**Setup.** E18 with λ = 0.3 (`results/E18b/`, notebook part C).
+
+![E18b](docs/E18b_comparison.png)
+
+| | train2 (seeds 0/1/2) | PPO (seeds 0/1/2) |
+|---|---|---|
+| displacement, 300 frames (100 rollouts) | 63.5 / 61.8 / 62.2 | **158.5 / 154.2 / 150.4** |
+| saturated commands | 56% / 55% / 58% | 2% / 2% / 0% |
+| mean \|Δa\| | 0.034 | 0.30 / 0.20 / 0.23 |
+| cumulative displacement at 1500 frames | ≈ 61 (all moved by frame 150) | **525** / 182 / 166 |
+| late / early speed | 0.00 | **0.39** / 0.02 / 0.01 |
+
+**Reading.**
+1. **Method comparison — robust.** At equal budget PPO beats train2 by ≈ 2.5× at 300
+   frames on all three seeds, and is still rising; train2 plateaus at the same ≈ 60 as
+   at λ = 1, with the same 55% tanh saturation. The ceiling does not depend on λ: it is
+   a property of the analytic gradient here, not of the reward.
+2. **Sustained swimming — not fixed by λ.** Only one PPO seed in three keeps swimming
+   beyond the horizon (the E16 λ = 0.3 run, 200 iterations, also did); the other two stop
+   after frame 300, and train2 never swims. Lowering λ made a sustained gait *possible*,
+   not *optimal*. The cause is the objective: 300 frames from a fixed start, net
+   displacement, terminal value 0 in PPO's GAE — a finite-horizon task in which "move
+   once and freeze" is a legitimate optimum.
+
+**Next (E20).** Treat the 300-frame cut as a time limit, not as the end of the world
+(Pardo et al., 2018, *Time Limits in Reinforcement Learning*): (a) persistent
+episodes — the next episode starts from the state where the previous one stopped, so a
+one-off deformation is spent after one episode; (b) in PPO, bootstrap the value of the
+last state instead of 0. Both methods get (a); (b) is PPO-specific (train2 has no
+critic — SHAC would add one).
+
+---
+
+## E19 — A morphology designed for this physics: the rower
+
+**Date:** 2026/11/03 — **Status:** open-loop result; PPO run planned (E18b notebook, part C).
+
+**Why.** The eel of E17 is a fish shape, not a design for *this* drag model. The rower is
+built from the simulator's own rules (`tools/rameur.py`): thrust comes from bones swept
+broadside (normal drag ×1); the return stroke must be edgewise (tangential ×0.3), which
+needs a joint that folds the blade, otherwise the motion is reciprocal and goes nowhere;
+a joint is a bone hinge plus one muscle setting its angle; a rigid body (two bone
+triangles) and top/bottom symmetric limbs prevent spinning. 8 nodes, 13 links, 4 muscles
+(shoulder and elbow-to-blade per limb), body length 140.
+
+**Open loop** (shoulder A_e·sin(2πt/T), wrist A_p·sin(2πt/T + ψ), same command on both
+limbs; 109 settings; 600 frames).
+
+| setting (A_e, A_p, T, ψ) | 300 frames | 600 frames |
+|---|---|---|
+| rest | 0 | 0 |
+| 1.0, 1.0, 20, π | 99 | 188 (body slowly turns, −36°) |
+| 1.0, 0.7, 40, −π/2 | 58 | 122 |
+| 0.7, 1.0, 40, −π/2 (GIF) | ≈ 50 | ≈ 100, straight line |
+| 0.7, 0.7, 40, **+π/2** | | **−103** |
+
+The displacement grows linearly with time and **reverses sign when the phase between
+shoulder and wrist reverses**: genuine non-reciprocal propulsion, not a transient. For
+scale, the open-loop wave on the reference gave ≈ 27 in 300 frames (E12) and the best
+eel wave ≈ 14 (E17). `docs/rameur_open_loop.gif`.
+
+**Next.** PPO, λ = 0.3, 150 iterations, judged with `tools/horizon_check.py` against
+the reference at the same λ (E18b).
+
+---
+
 ## Open questions
 
 - Is the vertical drift observed in replay (the body sinks as it advances) contributing to
