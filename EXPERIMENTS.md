@@ -545,6 +545,20 @@ change: ×4.5 at equal simulation budget. With one update per episode, train2 sp
 per rollout batch. Part of E11's gap between the two methods was therefore an
 update-frequency gap, not a property of gradients through the simulator.
 
+**Window length** (2026/10/24, same setup, `--maj-par-fenetre`, 150 episodes):
+
+| window | updates / episode | gradient norm, start → end | distance at episode 140 |
+|---|---|---|---|
+| 10 frames | 30 | 21 → 2 | ≈ 63 (flat from episode ≈ 100) |
+| 50 frames | 6 | 82 → 8 | 49 (still rising slowly) |
+| 150 frames | 2 | 80–104 → 15 | 27 |
+
+Longer windows were meant to lengthen the gradient's horizon. They do not raise the
+ceiling: the gradient norm through 50–150 frames of stiff dynamics is 8–10× the clip
+(10), so every step is truncated, and there are fewer of them. At equal budget the
+10-frame window wins. (A warm start of long windows from the 10-frame policy is the
+remaining variant; E18 later suggests the ceiling has a different cause, see there.)
+
 **Decision.** `--maj-par-fenetre` is the train2 variant used in E18.
 
 ---
@@ -675,7 +689,8 @@ alternating ±0.4 every decision pays the same as one held at 0.4. Raising
 
 ## E16 — Smoothness penalty: speed vs chattering
 
-**Date:** 2026/10/03 — **Status:** complete, 1 training seed per λ. **Chosen: λ = 1, 400 iterations.**
+**Date:** 2026/10/03 — **Status:** complete, 1 training seed per λ. ~~Chosen: λ = 1, 400 iterations.~~
+**Choice revised in E18: λ = 1 does not produce sustained swimming; λ = 0.3 is used from E18b on.**
 
 **Setup.** As E15 (clean physics: `sub_step = 20`, no clip) plus
 λ·Σ(a_t − a_{t−1})² on real muscles (`--coef-regularite`), PPO seed 0, 200 iterations
@@ -713,6 +728,25 @@ before training and call `drive.flush_and_unmount()` after.
 in 300 frames). Two candidate causes: the reference morphology (selected by evolution in
 the artefact-ridden physics of E12/E14, with a weak learner) or the physics itself
 (water drag 0.005 too low). Tested in E17.
+
+**Correction (2026/11/02, found in E18).** The λ sweep was judged on 300-frame
+displacement, the training horizon. Replayed for 1500 frames (`tools/horizon_check.py`,
+16 rollouts), the λ = 1 controllers stop moving shortly after frame 300:
+
+| λ | 300 frames | 1000 frames | 1500 frames | late / early speed |
+|---|---|---|---|---|
+| 0 (E15) | 217 | 623 | 920 | 0.72 |
+| 0.1 | 199 | 574 | 833 | 0.68 |
+| 0.3 | 170 | 473 | 689 | 0.63 |
+| 1 (200 it) | 96 | 105 | 111 | 0.02 |
+| 1 (400 it) | 133 | 143 | 145 | 0.01 |
+
+With λ ≤ 0.3 the gait is periodic and sustained; with λ = 1 the optimum of a 300-frame
+net-displacement objective in which every command change is expensive is a single slow
+body deformation, with no recovery stroke, that moves the body and then freezes. The low
+|Δa| of λ = 1 measured smoothness of a non-gait. **λ = 0.3** is the best sustained
+compromise (|Δa| 0.32 vs 0.44 at λ = 0). Lesson: always judge a controller beyond its
+training horizon — `evaluate_seeds.py` (1000 frames) would have caught it.
 
 ---
 
@@ -801,9 +835,99 @@ the PPO checkpoints: 134.7 vs 132.4 and 207 vs 211).
   0.005). A valid test retrains PPO at each drag. Not run: changing drag changes the
   physics, and the physics is frozen for now.
 
+**Correction (2026/11/02, after E18).** The PPO comparison above used λ = 1, which E18
+showed produces a non-sustained "one-stroke" gait on the reference. Replayed for 1500
+frames (`tools/horizon_check.py`), the two λ = 1 controllers behave differently:
+
+| | 300 frames | 1500 frames | late / early speed |
+|---|---|---|---|
+| eel + PPO λ = 1 | 35 (0.17 LC) | **158 (0.75 LC)** | 0.87 — sustained |
+| reference + PPO λ = 1 | 133 (0.66 LC) | 145 (0.72 LC) | 0.01 — stops |
+
+The eel keeps swimming; the reference stops. Over a long horizon the eel is not slower,
+so the "3.4× slower" reading of point 2 is withdrawn: it compared a sustained gait with
+a transient. A fair comparison needs both bodies at λ = 0.3 and a sustained-speed judge
+(planned in E18b). Point 3 (the building blocks cannot express anguilliform swimming as in
+real fish) is unaffected.
+
 **Decision.** The physics stays as is (`sub_step = 20`, no clip, water_drag = 0.005).
 Next: the method comparison (train2 vs PPO, 3 seeds) in this physics with the final
 reward (λ = 1); the in-family morphology test is optional.
+
+---
+
+## E18 — Differentiable simulation vs PPO in the clean physics (λ = 1)
+
+**Date:** 2026/11/02 — **Status:** complete, 3 training seeds per method. The comparison is
+valid as an optimisation result, but the objective (λ = 1) turned out not to produce
+swimming: rerun at λ = 0.3 planned (E18b).
+
+**Setup.** Clean physics (`sub_step = 20`, no clip, `water_drag = 0.005`), reward of E16
+with λ = 1 (energy cost negligible: `coef_energie = 10 000` makes it ≈ 0.3% of progress),
+reference morphology, random initial controller, 150 episodes of train2 = 150 PPO
+iterations (identical simulation budget, 1.8·10⁹ physics sub-steps × rollouts),
+seeds 0–2, compiled physics, Colab T4 (`colab/E18_clean_comparison.ipynb`, part B).
+train2 variant chosen by E13: per-window updates, 10-frame window. Logs in
+`results/E18/B/runs/`.
+
+![E18](docs/E18_lambda1_comparison.png)
+
+**1. Learning curves.** train2 learns faster for the first ≈ 0.3·10⁹ sub-steps, then
+both methods cross; train2 plateaus at ≈ 55 reward on all three seeds from ≈ episode 100,
+while PPO is still rising at the end (≈ 82). The seed-1 train2 run from an earlier
+interrupted session, trained 400 episodes, was still at ≈ 64 distance at episode 320:
+the plateau is not under-training.
+
+**2. Gait** (`tools/diagnose_gait.py`, 100 rollouts × 300 frames).
+
+| | train2 (seeds 0/1/2) | PPO (seeds 0/1/2) |
+|---|---|---|
+| displacement, 300 frames | 62.7 / 62.4 / 61.5 | 80.6 / 103.3 / 87.9 |
+| mean \|a\| | 0.82 / 0.90 / 0.84 | 0.27 / 0.23 / 0.19 |
+| saturated commands (\|a\| ≥ 0.99) | **51% / 68% / 54%** | 0% / 0% / 0% |
+| mean \|Δa\| | 0.035 | 0.07 / 0.14 / 0.09 |
+| vertical drift | −1 to −2 | −26 / −2 / −23 |
+
+**Why train2 plateaus.** Its tanh outputs are saturated half to two-thirds of the time.
+At saturation the derivative of tanh is ≈ 0, so the analytic gradient no longer reaches
+those commands — consistent with the gradient norm collapsing from ≈ 20 to ≈ 1.5 in the
+logs while performance stays flat, and with E13's finding that a longer window does not
+help. PPO never saturates, although its Gaussian mean also goes through the tanh. A plausible
+reason: with exploration noise of std ≈ 0.12 and the environment clipping actions to
+[−1, 1], a mean near ±1 wastes half of its samples, so the likelihood gradient has no
+incentive to push it into the tails (not tested separately).
+This is a concrete instance of the failure modes of first-order gradients through
+simulators discussed by Suh et al. (2022).
+
+**3. Beyond the training horizon** (`tools/horizon_check.py`, 16 rollouts, cumulative
+displacement).
+
+| | 150 | 300 | 600 | 1000 | 1500 frames | late / early speed |
+|---|---|---|---|---|---|---|
+| train2 seeds 0/1/2 | ≈ 62 | ≈ 62 | ≈ 62 | ≈ 62 | ≈ 62 | 0.00 |
+| PPO seed 0 | 71 | 80 | 79 | 85 | 88 | 0.01 |
+| PPO seed 1 | 73 | 102 | 107 | 107 | 106 | 0.00 |
+| PPO seed 2 | 67 | 87 | 87 | 89 | 90 | 0.00 |
+
+No controller keeps swimming. train2 gets all of its displacement in the first 150 frames,
+then freezes in a saturated posture; PPO stops around frame 300. Both have found the
+optimum of a 300-frame net-displacement objective in which every change of command is
+expensive: one slow deformation of the body, no recovery stroke. This revealed the E16
+error (see the correction there): λ = 1 makes "swim" and "shift once" indistinguishable
+within the horizon, and λ = 1 was chosen on a 300-frame judge.
+
+**Reading.** As an optimisation comparison on a fixed objective, PPO beats the best
+train2 variant at equal budget (+30 to +65% at 300 frames, all three seeds), and the
+reason is identified (tanh saturation starving the analytic gradient). As a swimming
+result it is void: the objective itself rewards a transient. Lessons kept in the
+protocol: (1) the final judge is displacement over ≥ 1000 frames plus the late/early
+speed ratio; (2) a reward shaping term must be checked for the behaviour it makes
+optimal, not only for the statistic it lowers.
+
+**Next (E18b).** Same protocol at λ = 0.3 (sustained in E16), judged with
+`tools/horizon_check.py`; plus eel + PPO at λ = 0.3 to settle E17 fairly. Possible
+remedies for train2's saturation to test after: a penalty on pre-activations, or a
+lower-gain output (`tanh(x/2)`), or action noise injected before the tanh.
 
 ---
 
@@ -819,7 +943,9 @@ reward (λ = 1); the in-family morphology test is optional.
   roughly every 20 episodes. Unavoidable in part (parameter shapes change under mutation),
   but it means phase 1 never runs a warm optimiser.
 - The reward still telescopes to net displacement, so nothing requires sustained
-  motion. Next experiment: reward maintained velocity instead.
+  motion. E18 showed it matters (with λ = 1 every controller stops after the horizon).
+  λ = 0.3 sustains for now; a reward on maintained velocity, or training episodes of
+  random length, would remove the loophole instead of avoiding it.
 
 ## Related work to read
 

@@ -18,3 +18,5 @@ videos_ia*/
 # Environnement Linux de Claude (wheels hors-ligne + venv)
 .vm_wheels/
 .vm_venv/
+!results/E18/B/runs/
+!results/E18b/runs/
