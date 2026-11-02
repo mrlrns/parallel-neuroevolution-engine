@@ -11,6 +11,7 @@ Usage :
     python train2.py --config config.yaml --chemin-champion ... --nb-episodes 500
     python train2.py --chemin-champion ... --poids-aleatoires --seed 1   # comparaison de méthodes
     python train2.py --chemin-champion ... --poids-aleatoires --maj-par-fenetre   # E12
+    python train2.py ... --maj-par-fenetre --episodes-enchaines --frames-selection 900   # E20
 """
 
 import os
@@ -19,6 +20,7 @@ from datetime import datetime
 
 import torch
 
+from baselines.env import evaluer_politique, recentrer, reinitialiser_explosions
 from brain import Brain
 from champion import charger_champion
 from config import Config, build_argparser, load_config
@@ -60,6 +62,9 @@ def main():
     if FENETRE % 5 != 0:
         parser.error("--fenetre-bptt doit être un multiple de 5 (une décision toutes les 5 frames)")
     LEARNING_RATE = cfg.learning_rate
+    ENCHAINES = cfg.episodes_enchaines
+    if ENCHAINES and not cfg.maj_par_fenetre:
+        parser.error("--episodes-enchaines exige --maj-par-fenetre (l'état est conservé entre fenêtres)")
 
     COEF_ENERGIE = cfg.coef_energie
     COEF_HAUTEUR = cfg.coef_hauteur
@@ -108,6 +113,7 @@ def main():
             "fenetre_bptt": FENETRE, "maj_par_fenetre": cfg.maj_par_fenetre,
             "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee, "v_max": cfg.v_max,
             "coef_regularite": cfg.coef_regularite, "water_drag": cfg.water_drag,
+            "episodes_enchaines": ENCHAINES, "frames_selection": cfg.frames_selection,
         },
     )
 
@@ -120,15 +126,28 @@ def main():
     def sauvegarder(chemin):
         torch.save(champ.to_save_dict(meilleurs_poids), chemin)
 
+    def nouvelle_physique():
+        m = Physique(dico, BATCH_SIZE, device=device)
+        m.v_max = cfg.v_max
+        m.water_drag = cfg.water_drag
+        m.coef_regularite = cfg.coef_regularite
+        return m
+
+    mega = None
+    frame_globale = 0     # horloge des observations : continue d'un épisode à l'autre en mode enchaîné
+
     # ==========================================
     # 🏋️ BOUCLE D'ENTRAÎNEMENT
     # ==========================================
     for episode in range(NB_EPISODES):
 
-        mega = Physique(dico, BATCH_SIZE, device=device)
-        mega.v_max = cfg.v_max
-        mega.water_drag = cfg.water_drag
-        mega.coef_regularite = cfg.coef_regularite
+        if ENCHAINES and mega is not None:
+            # E20 : on reprend l'état final de l'épisode précédent (déjà détaché par la
+            # dernière mise à jour), recentré sur l'origine pour la précision float32.
+            recentrer(mega)
+        else:
+            mega = nouvelle_physique()
+            frame_globale = 0
         nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
         pos_depart = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n).detach().clone()
 
@@ -151,9 +170,10 @@ def main():
             score_total = torch.zeros(BATCH_SIZE, device=device)
             r_fenetre = None
             normes, nb_maj = [], 0
+            exclus = torch.zeros(BATCH_SIZE, dtype=torch.bool, device=device)  # rollouts remis au repos
 
             def mise_a_jour():
-                nonlocal r_fenetre, nb_maj
+                nonlocal r_fenetre, nb_maj, exclus
                 loss_f = -torch.sum(r_fenetre) / BATCH_SIZE
                 ok = bool(torch.isfinite(loss_f))
                 if ok:
@@ -164,6 +184,12 @@ def main():
                     nb_maj += 1
                 r_fenetre = None
                 detacher_etat(mega)
+                if not ok and ENCHAINES:
+                    # E20 : on saute cette fenêtre et on remet au repos les seuls rollouts
+                    # qui ont explosé ; l'épisode (et l'état des autres) continue.
+                    optimizer.zero_grad(set_to_none=True)
+                    exclus = exclus | reinitialiser_explosions(mega, nouvelle_physique)
+                    return True
                 return ok
 
             def recompenser():
@@ -171,7 +197,7 @@ def main():
                 # qui l'a produit : chaque action est créditée de SON effet (comme SwimEnv).
                 nonlocal r_fenetre
                 r = mega.get_reward(COEF_ENERGIE, COEF_HAUTEUR)
-                score_total.add_(r[0].detach())
+                score_total.add_(torch.nan_to_num(r[0].detach(), nan=0.0, posinf=0.0, neginf=0.0))
                 r_fenetre = r if r_fenetre is None else r_fenetre + r
 
             for frame in range(FRAME_NB):
@@ -184,12 +210,13 @@ def main():
                         if frame % FENETRE == 0 and not mise_a_jour():
                             explosion = True
                             break
-                    obs = mega.get_observation(frame)
+                    obs = mega.get_observation(frame_globale + frame)
                     action = cerveau(obs)
-                    mega.apply_action(action + torch.randn_like(action) * bruit_scale, frame)
+                    mega.apply_action(action + torch.randn_like(action) * bruit_scale, frame_globale + frame)
                 for _ in range(SUB_STEP):
                     mega.apply_physics(dt)
                 sim_steps += BATCH_SIZE * SUB_STEP
+            frame_globale += FRAME_NB
             if not explosion:
                 recompenser()                      # mouvement des 5 dernières frames
                 if not mise_a_jour():
@@ -202,24 +229,39 @@ def main():
                 optimizer.zero_grad(set_to_none=True)
                 continue
 
-            score_moyen = score_total.mean().item()
-            if score_moyen > meilleur_score_global:
+            garde = ~exclus
+            score_moyen = score_total[garde].mean().item()
+            eval_score = eval_depl = None
+            if ENCHAINES:
+                # E20 : la sélection ne se fait plus sur la tranche d'entraînement (qui repart
+                # d'états variés) mais sur frames_selection frames depuis le repos, comme PPO.
+                if episode % cfg.ppo_eval_tous_les == 0 or episode == NB_EPISODES - 1:
+                    eval_score, eval_depl = evaluer_politique(cerveau, dico, cfg.ppo_eval_n_envs,
+                                                              cfg.frames_selection, cfg, device)
+                    if eval_score > meilleur_score_global:
+                        meilleur_score_global = eval_score
+                        meilleurs_poids = {k: v.detach().clone() for k, v in cerveau.state_dict().items()}
+            elif score_moyen > meilleur_score_global:
                 meilleur_score_global = score_moyen
                 meilleurs_poids = poids_debut
             with torch.no_grad():
                 nb_n = torch.clamp(torch.sum(mega.mask_N_exp, dim=2), min=1.0)
-                distance_finale = ((torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n) - pos_depart).mean().item()
+                depl = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n) - pos_depart
+                distance_finale = depl[0][garde].mean().item()
             norm_moy = sum(normes) / max(1, len(normes))
             logger.log(
                 episode=episode, sim_steps=sim_steps, score_mean=score_moyen,
-                score_std=score_total.std().item(), grad_norm=norm_moy, grad_norm_max=max(normes, default=0.0),
+                score_std=score_total[garde].std().item(), grad_norm=norm_moy,
+                grad_norm_max=max(normes, default=0.0),
                 nb_maj=nb_maj, distance_moyenne=distance_finale, bruit_scale=bruit_scale,
                 meilleur_score_global=meilleur_score_global, explosion=False,
+                eval_score_mean=eval_score, eval_distance_moyenne=eval_depl, nb_reinit=int(exclus.sum().item()),
             )
             if episode % 10 == 0:
+                ev = f" | éval {eval_score:7.2f}" if eval_score is not None else ""
                 print(f"Ép. {episode:4d} | moyenne: {score_moyen:8.2f} | écart-type: {score_total.std().item():8.2f} | "
                       f"{nb_maj} màj, norme moy {norm_moy:.2f} | distance moy: {distance_finale:7.2f} | "
-                      f"bruit: {bruit_scale:.4f}")
+                      f"bruit: {bruit_scale:.4f}{ev}")
             if episode % SAUVEGARDE_TOUS_LES == 0 and meilleurs_poids is not None:
                 sauvegarder(f"{cfg.dossier_champion_raffine}/raffine_seed{SEED}_ep{episode}_score_{meilleur_score_global:.1f}.pt")
             continue

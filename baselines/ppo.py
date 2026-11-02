@@ -21,6 +21,12 @@ Pas de normalisation d'observation : elle ferait partie de la politique et
 casserait la compatibilité avec Brain ; les observations sont déjà
 normalisées à la main dans megaVecto.get_observation.
 
+Épisodes enchaînés (E20, `--episodes-enchaines`) : chaque itération reprend l'état
+final de la précédente (SwimEnv.nouvelle_tranche). Le GAE garde une valeur terminale
+nulle en fin de tranche : seule la correction « pas de retour au repos » change, la
+même que pour train2. Le meilleur checkpoint est choisi sur `frames_selection` frames
+depuis le repos (900 en E20) pour qu'un coup unique ne puisse pas l'emporter.
+
 Usage :
     python -m baselines.ppo --chemin-champion champion_raffine/reference.pt --poids-aleatoires --seed 0
 """
@@ -33,7 +39,7 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 
-from baselines.env import SwimEnv
+from baselines.env import SwimEnv, evaluer_politique
 from brain import Brain
 from champion import charger_champion
 from config import Config, build_argparser, load_config
@@ -77,23 +83,10 @@ class Agent(nn.Module):
         return (dist.entropy() * self.masque).sum(-1)
 
 
-@torch.no_grad()
 def evaluer(agent, champ, cfg, device):
-    """Rollout quasi-déterministe (moyenne + bruit 0.02, comme evaluate_seeds.py)
-    sur un env séparé : n'entre pas dans le budget `sim_steps`."""
-    env = SwimEnv(champ.dico, cfg.ppo_eval_n_envs, cfg.train2_frame_nb, cfg.sub_step,
-                  cfg.coef_energie, cfg.coef_hauteur, device,
-                  physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
-                  coef_regularite=cfg.coef_regularite,
-                  water_drag=cfg.water_drag)
-    obs = env.reset()
-    total = torch.zeros(env.n, device=device)
-    done = False
-    while not done:
-        a = agent.acteur(obs)
-        obs, r, done = env.step(a + torch.randn_like(a) * cfg.bruit_test)
-        total += r
-    return total.mean().item(), env.deplacement().mean().item()
+    """Rollout quasi-déterministe (moyenne + bruit `bruit_test`) sur `frames_selection` frames
+    depuis le repos, sur un env séparé : n'entre pas dans le budget `sim_steps`."""
+    return evaluer_politique(agent.acteur, champ.dico, cfg.ppo_eval_n_envs, cfg.frames_selection, cfg, device)
 
 
 def entrainer(cfg: Config):
@@ -108,7 +101,7 @@ def entrainer(cfg: Config):
                   cfg.coef_energie, cfg.coef_hauteur, device,
                   physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
                   coef_regularite=cfg.coef_regularite,
-                  water_drag=cfg.water_drag)
+                  water_drag=cfg.water_drag, reinit_explosions=cfg.episodes_enchaines)
     T, N = env.nb_decisions, env.n
     obs_size, act_size = champ.obs_size, champ.action_size
 
@@ -129,7 +122,8 @@ def entrainer(cfg: Config):
                                              "chemin_champion", "seed", "sub_step", "train2_frame_nb",
                                              "coef_energie", "coef_hauteur", "poids_aleatoires",
                                              "physique_compilee", "v_max",
-                                             "coef_regularite", "water_drag")}},
+                                             "coef_regularite", "water_drag",
+                                             "episodes_enchaines", "frames_selection")}},
     )
 
     # Tampons du rollout : [T, N, ...]
@@ -159,7 +153,8 @@ def entrainer(cfg: Config):
             eval_score = eval_depl = None
 
         # ---------- 1. Rollout : un épisode complet sur N envs ----------
-        obs = env.reset()
+        # E20 : en épisodes enchaînés, on reprend là où l'itération précédente s'est arrêtée.
+        obs = env.nouvelle_tranche() if (cfg.episodes_enchaines and it > 0) else env.reset()
         with torch.no_grad():
             for t in range(T):
                 dist = agent.distribution(obs)
@@ -230,6 +225,7 @@ def entrainer(cfg: Config):
             pg_loss=pg_loss.item(), v_loss=v_loss.item(), entropie=ent.item(),
             approx_kl=approx_kl.item(), clipfrac=sum(clipfracs) / max(1, len(clipfracs)),
             std_moyen=(agent.log_std.exp() * agent.masque).sum().item() / agent.masque.sum().item(),
+            nb_reinit=env.nb_reinit,
         )
         if it % 10 == 0:
             ev = f"{eval_score:8.2f}" if eval_score is not None else "     ---"

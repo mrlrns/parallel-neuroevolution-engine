@@ -10,6 +10,14 @@ Métriques tracées :
                  d'entraînement, pour comparer des politiques de même bruit.
 Le verdict final reste evaluate_seeds.py sur les checkpoints (20 seeds × 1000 frames).
 
+Épisodes enchaînés (E20, `--enchaines`) : deux panneaux, avec la même métrique
+pour les deux méthodes dans chaque panneau :
+  - gauche : récompense par tranche d'entraînement (score_mean ; bruit
+    d'exploration propre à chaque méthode : ≤ 0.03 pour train2, std appris ≈ 0.1–0.2
+    pour PPO) ;
+  - droite : évaluation sur `frames_selection` frames depuis le repos
+    (eval_score_mean, même bruit 0.02 pour les deux) : celle qui choisit le checkpoint.
+
 Usage :
     python -m baselines.compare \
         --diffsim "runs/train_phase2_seed*.jsonl" --ppo "runs/ppo_seed*.jsonl" \
@@ -60,34 +68,45 @@ def main():
     p.add_argument("--ppo", required=True, help="glob des logs baselines/ppo.py")
     p.add_argument("--sortie", default="baseline_ppo.png")
     p.add_argument("--lineaire", action="store_true", help="axe vertical linéaire (logarithmique par défaut)")
+    p.add_argument("--enchaines", action="store_true",
+                   help="E20 : deux panneaux (récompense par tranche | évaluation depuis le repos)")
+    p.add_argument("--frames-eval", type=int, default=900, help="horizon de l'évaluation (titre du panneau droit)")
     p.add_argument("--reference", type=float, default=None,
                    help="score du champion de référence, tracé en pointillés (même horizon)")
     a = p.parse_args()
 
-    # Un seul panneau : la pénalité d'énergie est négligeable, récompense ≈ déplacement.
+    fichiers = {"diffsim": sorted(glob.glob(a.diffsim)), "ppo": sorted(glob.glob(a.ppo))}
+    if a.enchaines:
+        panneaux = [({"diffsim": "score_mean", "ppo": "score_mean"},
+                     "reward per 300-frame training chunk\n(chained episodes, own exploration noise)"),
+                    ({"diffsim": "eval_score_mean", "ppo": "eval_score_mean"},
+                     f"evaluation: {a.frames_eval} frames from rest\n(noise 0.02, selects the checkpoint)")]
+    else:
+        # Un seul panneau : la pénalité d'énergie est négligeable, récompense ≈ déplacement.
+        panneaux = [({m: METRIQUES[m][0] for m in fichiers}, "mean episode reward, 300 frames")]
     # Pas de bande : avec 3 seeds, un écart-type n'est pas une estimation fiable ;
     # on montre chaque seed (trait fin) et leur moyenne (trait épais).
-    fichiers = {"diffsim": sorted(glob.glob(a.diffsim)), "ppo": sorted(glob.glob(a.ppo))}
-    fig, ax = plt.subplots(figsize=(7.5, 4.8))
-    for methode, fs in fichiers.items():
-        res = agreger(fs, METRIQUES[methode][0])
-        if res is None:
-            print(f"⚠️  aucun point pour {methode}")
-            continue
-        x, ys = res
-        ligne, = ax.plot(x, ys.mean(0), lw=2.5, label=f"{LABELS[methode]} — mean of {ys.shape[0]} seeds")
-        for y in ys:
-            ax.plot(x, y, lw=1, alpha=0.35, color=ligne.get_color())
-    if a.reference is not None:
-        ax.axhline(a.reference, ls="--", lw=1.2, color="0.4",
-                   label="reference champion (evolution + refinement)")
-    ax.set_xlabel("simulation budget (physics sub-steps × rollouts)")
-    ax.set_ylabel("mean episode reward, 300 frames" + ("" if a.lineaire else " (log)"))
-    if not a.lineaire:
-        ax.set_yscale("log")
-    ax.grid(alpha=0.3, which="both")
-    ax.legend(frameon=False, loc="lower right")
-    ax.set_title("Differentiable simulation vs PPO at equal simulation budget\n"
+    fig, axes = plt.subplots(1, len(panneaux), figsize=(7.5 * len(panneaux), 4.8), squeeze=False)
+    for ax, (cles, titre_y) in zip(axes[0], panneaux):
+        for methode, fs in fichiers.items():
+            res = agreger(fs, cles[methode])
+            if res is None:
+                print(f"⚠️  aucun point pour {methode} ({cles[methode]})")
+                continue
+            x, ys = res
+            ligne, = ax.plot(x, ys.mean(0), lw=2.5, label=f"{LABELS[methode]} — mean of {ys.shape[0]} seeds")
+            for y in ys:
+                ax.plot(x, y, lw=1, alpha=0.35, color=ligne.get_color())
+        if a.reference is not None:
+            ax.axhline(a.reference, ls="--", lw=1.2, color="0.4",
+                       label="reference champion (evolution + refinement)")
+        ax.set_xlabel("simulation budget (physics sub-steps × rollouts)")
+        ax.set_ylabel(titre_y + ("" if a.lineaire else " (log)"))
+        if not a.lineaire:
+            ax.set_yscale("log")
+        ax.grid(alpha=0.3, which="both")
+        ax.legend(frameon=False, loc="lower right")
+    fig.suptitle("Differentiable simulation vs PPO at equal simulation budget — "
                  "random initial controller; thin lines = individual training seeds", fontsize=10)
     fig.tight_layout()
     fig.savefig(a.sortie, dpi=150)

@@ -960,12 +960,18 @@ runs pending).
    displacement, terminal value 0 in PPO's GAE — a finite-horizon task in which "move
    once and freeze" is a legitimate optimum.
 
-**Next (E20).** Treat the 300-frame cut as a time limit, not as the end of the world
-(Pardo et al., 2018, *Time Limits in Reinforcement Learning*): (a) persistent
-episodes — the next episode starts from the state where the previous one stopped, so a
-one-off deformation is spent after one episode; (b) in PPO, bootstrap the value of the
-last state instead of 0. Both methods get (a); (b) is PPO-specific (train2 has no
-critic — SHAC would add one).
+**Next (E20, agreed plan).** Treat the 300-frame cut as a time limit, not as the end of
+the world (Pardo et al., 2018, *Time Limits in Reinforcement Learning*), with the same
+correction for both methods: **chained episodes** (`--episodes-enchaines`) — the next
+episode resumes from the state where the previous one stopped (shape, velocities,
+muscle targets, last command; body re-centred, which is a pure translation), so a
+one-off deformation pays once and only a repeatable gait keeps paying. PPO keeps a zero
+terminal value (bootstrapping V would be a second, PPO-only change, left for later with
+SHAC). The best checkpoint is selected on **900 frames from rest** for both methods
+(`--frames-selection 900`), and an exploded rollout is reset to rest alone (counted in the
+logs as `nb_reinit`). Protocol: λ = 0.3, 150 episodes, seed 0 pilot judged with
+`tools/horizon_check.py`, then seeds 1–2 (notebook part D). Prediction: it helps PPO more
+than train2, whose saturated tanh outputs leave little gradient in frozen states.
 
 ---
 
