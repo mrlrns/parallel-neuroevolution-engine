@@ -222,7 +222,7 @@ python -m baselines.compare --diffsim "runs/train_phase2_seed*.jsonl" \
 python evaluate_seeds.py --chemin-champion baselines_out/ppo_seed0_best.pt --nb-seeds 20
 ```
 
-On Colab: [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrlrns/parallel-neuroevolution-engine/blob/main/colab/E18_clean_comparison.ipynb) — runs the current protocol (E13 pilot + E18 comparison, clean physics) on a GPU and writes every output to Google Drive.
+On Colab: [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrlrns/parallel-neuroevolution-engine/blob/main/colab/E18_clean_comparison.ipynb) — runs the current protocol on a GPU (clean physics: E13 pilot, E18 comparison at λ = 1, **E18b at λ = 0.3, part C**) and writes every output to Google Drive.
 The original E11 notebook, run in the physics later found to be unstable (E12), is kept in [`colab/baseline_runs.ipynb`](colab/baseline_runs.ipynb) for the record.
 
 Results: E13 and E18 in [EXPERIMENTS.md](EXPERIMENTS.md) (E11 is superseded).
