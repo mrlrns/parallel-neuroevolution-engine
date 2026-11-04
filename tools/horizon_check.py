@@ -53,9 +53,13 @@ def main():
     p.add_argument("--points", type=int, nargs="+", default=[150, 300, 600, 1000, 1500])
     p.add_argument("--n", type=int, default=16, help="rollouts par checkpoint")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--bruit", type=float, default=None,
+                   help="écart-type du bruit d'action (défaut : bruit_test de la config, 0.02)")
     a = p.parse_args()
     assert all(x % 5 == 0 and x <= a.frames for x in a.points), "points : multiples de 5, ≤ --frames"
     cfg = Config()
+    if a.bruit is not None:
+        cfg.bruit_test = a.bruit
 
     largeur = max(len(c) for c in a.checkpoints)
     tete = "  ".join(f"{x:>7d}" for x in a.points)

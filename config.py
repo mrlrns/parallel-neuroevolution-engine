@@ -92,6 +92,7 @@ class Config:
     physique_compilee: bool = False    # MegaCreaFast + torch.compile (×3–4 sur GPU, même physique)
     episodes_enchaines: bool = False   # E20 : chaque épisode repart de l'état final du précédent (train2 et PPO)
     frames_selection: int = 300        # horizon (frames, depuis le repos) de l'évaluation qui choisit le meilleur checkpoint
+    proba_retour_repos: float = 0.0    # E20b : en épisodes enchaînés, proba qu'un rollout reparte du repos à chaque tranche
 
     # ---------- baselines/ppo.py (baseline PPO, même morphologie figée) ----------
     dossier_baselines: str = "baselines_out"
@@ -192,6 +193,8 @@ _AIDE = {
     "physique_compilee": "Physique MegaCreaFast compilée par torch.compile (GPU ; même physique, ×3–4)",
     "episodes_enchaines": "E20 : chaque épisode repart de l'état final du précédent au lieu du repos "
                           "(train2 : exige --maj-par-fenetre)",
+    "proba_retour_repos": "E20b : en épisodes enchaînés, probabilité qu'un rollout reparte du repos "
+                          "à chaque nouvel épisode (apprend à démarrer ; 0 = jamais)",
     "frames_selection": "Horizon (frames depuis le repos) de l'évaluation qui choisit le meilleur checkpoint "
                         "(PPO toujours ; train2 en épisodes enchaînés)",
     "dossier_baselines": "Dossier de sortie des checkpoints des baselines",
@@ -241,6 +244,7 @@ _CHAMPS_PAR_SCRIPT = {
         "poids_aleatoires", "fenetre_bptt", "maj_par_fenetre",
         "detachement_complet", "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "ppo_eval_tous_les", "ppo_eval_n_envs", "bruit_test",
+        "proba_retour_repos",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
@@ -249,7 +253,7 @@ _CHAMPS_PAR_SCRIPT = {
         "ppo_clip", "ppo_epochs", "ppo_minibatches", "ppo_ent_coef", "ppo_vf_coef",
         "ppo_max_grad_norm", "ppo_std_init", "ppo_eval_tous_les", "ppo_eval_n_envs",
         "physique_compilee", "v_max", "water_drag", "coef_regularite",
-        "episodes_enchaines", "frames_selection", "bruit_test",
+        "episodes_enchaines", "frames_selection", "bruit_test", "proba_retour_repos",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",

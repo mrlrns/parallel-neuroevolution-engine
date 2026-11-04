@@ -1,0 +1,21 @@
+W1102 15:43:13.001000 1587 torch/_inductor/utils.py:1731] [0/0] Not enough SMs to use max_autotune_gemm mode
+Device utilisé : cuda
+Acteur initialisé aléatoirement
+It.    0 | score (stochastique)     7.41 | éval     3.89 | distance   17.54 | kl 0.0071 | std 0.200
+It.   10 | score (stochastique)    -6.50 | éval    13.79 | distance    2.01 | kl 0.0085 | std 0.189
+It.   20 | score (stochastique)    -5.96 | éval    22.21 | distance    0.61 | kl 0.0072 | std 0.178
+It.   30 | score (stochastique)    -4.01 | éval    24.83 | distance    1.24 | kl 0.0066 | std 0.169
+It.   40 | score (stochastique)    -1.09 | éval    24.98 | distance    3.46 | kl 0.0079 | std 0.163
+It.   50 | score (stochastique)    -0.27 | éval    24.17 | distance    3.74 | kl 0.0097 | std 0.157
+It.   60 | score (stochastique)     0.82 | éval    24.41 | distance    4.51 | kl 0.0096 | std 0.152
+It.   70 | score (stochastique)     2.21 | éval    24.38 | distance    5.77 | kl 0.0074 | std 0.148
+It.   80 | score (stochastique)     3.92 | éval    24.54 | distance    7.58 | kl 0.0069 | std 0.145
+It.   90 | score (stochastique)     5.70 | éval    24.31 | distance    9.55 | kl 0.0071 | std 0.142
+It.  100 | score (stochastique)     7.77 | éval    24.12 | distance   11.86 | kl 0.0081 | std 0.140
+It.  110 | score (stochastique)     9.64 | éval    23.97 | distance   13.95 | kl 0.0070 | std 0.138
+It.  120 | score (stochastique)    11.12 | éval    24.03 | distance   15.67 | kl 0.0122 | std 0.136
+It.  130 | score (stochastique)    12.28 | éval    23.95 | distance   17.02 | kl 0.0069 | std 0.135
+It.  140 | score (stochastique)    12.98 | éval    23.74 | distance   17.93 | kl 0.0086 | std 0.134
+
+🏆 Meilleur score d'évaluation : 25.70
+💾 /content/drive/MyDrive/watercrea/E20/ppo/ppo_seed0_best.pt  (format Brain : passe dans evaluate_seeds.py)

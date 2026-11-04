@@ -123,7 +123,8 @@ def entrainer(cfg: Config):
                                              "coef_energie", "coef_hauteur", "poids_aleatoires",
                                              "physique_compilee", "v_max",
                                              "coef_regularite", "water_drag",
-                                             "episodes_enchaines", "frames_selection")}},
+                                             "episodes_enchaines", "frames_selection",
+                                             "proba_retour_repos")}},
     )
 
     # Tampons du rollout : [T, N, ...]
@@ -154,7 +155,7 @@ def entrainer(cfg: Config):
 
         # ---------- 1. Rollout : un épisode complet sur N envs ----------
         # E20 : en épisodes enchaînés, on reprend là où l'itération précédente s'est arrêtée.
-        obs = env.nouvelle_tranche() if (cfg.episodes_enchaines and it > 0) else env.reset()
+        obs = env.nouvelle_tranche(cfg.proba_retour_repos) if (cfg.episodes_enchaines and it > 0) else env.reset()
         with torch.no_grad():
             for t in range(T):
                 dist = agent.distribution(obs)

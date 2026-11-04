@@ -1,0 +1,24 @@
+W1102 15:43:13.008000 1586 torch/_inductor/utils.py:1731] [0/0] Not enough SMs to use max_autotune_gemm mode
+Device utilisé : cuda
+✅ Champion chargé depuis champion_raffine/reference.pt
+   Topologie : 9 noeuds, 12 liens (7 muscles, 5 os)
+   Padding d'origine : max_noeuds=11, max_muscles=14
+   Cerveau RÉINITIALISÉ (poids aléatoires) — comparaison de méthodes
+Ép.    0 | moyenne:     6.49 | écart-type:     0.99 | 30 màj, norme moy 15.73 | distance moy:    6.82 | bruit: 0.0300 | éval    6.22
+Ép.   10 | moyenne:    -0.06 | écart-type:     0.22 | 30 màj, norme moy 4.79 | distance moy:    0.53 | bruit: 0.0280 | éval   23.73
+Ép.   20 | moyenne:    -0.11 | écart-type:     0.60 | 30 màj, norme moy 4.71 | distance moy:    0.89 | bruit: 0.0260 | éval   31.15
+Ép.   30 | moyenne:    -0.92 | écart-type:     0.37 | 30 màj, norme moy 1.44 | distance moy:    0.15 | bruit: 0.0240 | éval   36.90
+Ép.   40 | moyenne:    -1.00 | écart-type:     0.26 | 30 màj, norme moy 1.08 | distance moy:    0.04 | bruit: 0.0220 | éval   37.74
+Ép.   50 | moyenne:    -0.88 | écart-type:     0.22 | 30 màj, norme moy 0.83 | distance moy:    0.07 | bruit: 0.0200 | éval   37.99
+Ép.   60 | moyenne:    -0.97 | écart-type:     0.18 | 30 màj, norme moy 0.66 | distance moy:   -0.02 | bruit: 0.0180 | éval   38.93
+Ép.   70 | moyenne:    -0.98 | écart-type:     0.19 | 30 màj, norme moy 0.57 | distance moy:    0.01 | bruit: 0.0160 | éval   40.84
+Ép.   80 | moyenne:    -1.01 | écart-type:     0.36 | 30 màj, norme moy 0.66 | distance moy:    0.06 | bruit: 0.0140 | éval   42.28
+Ép.   90 | moyenne:    -1.22 | écart-type:     0.49 | 30 màj, norme moy 0.58 | distance moy:   -0.02 | bruit: 0.0120 | éval   43.64
+Ép.  100 | moyenne:    -1.31 | écart-type:     0.37 | 30 màj, norme moy 0.43 | distance moy:   -0.07 | bruit: 0.0100 | éval   42.59
+Ép.  110 | moyenne:    -1.23 | écart-type:     0.41 | 30 màj, norme moy 0.36 | distance moy:    0.01 | bruit: 0.0080 | éval   43.83
+Ép.  120 | moyenne:    -1.25 | écart-type:     0.37 | 30 màj, norme moy 0.33 | distance moy:   -0.01 | bruit: 0.0060 | éval   45.03
+Ép.  130 | moyenne:    -1.25 | écart-type:     0.11 | 30 màj, norme moy 0.35 | distance moy:    0.01 | bruit: 0.0050 | éval   44.33
+Ép.  140 | moyenne:    -1.27 | écart-type:     0.13 | 30 màj, norme moy 0.42 | distance moy:    0.01 | bruit: 0.0050 | éval   45.73
+
+🏆 Terminé — meilleur score : 45.73
+💾 Sauvegardé dans /content/drive/MyDrive/watercrea/E20/diffsim/FINAL_seed0_score_45.7.pt

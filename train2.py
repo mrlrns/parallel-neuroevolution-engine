@@ -20,7 +20,7 @@ from datetime import datetime
 
 import torch
 
-from baselines.env import evaluer_politique, recentrer, reinitialiser_explosions
+from baselines.env import evaluer_politique, recentrer, reinitialiser_explosions, retours_au_repos
 from brain import Brain
 from champion import charger_champion
 from config import Config, build_argparser, load_config
@@ -114,6 +114,7 @@ def main():
             "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee, "v_max": cfg.v_max,
             "coef_regularite": cfg.coef_regularite, "water_drag": cfg.water_drag,
             "episodes_enchaines": ENCHAINES, "frames_selection": cfg.frames_selection,
+            "proba_retour_repos": cfg.proba_retour_repos,
         },
     )
 
@@ -145,6 +146,7 @@ def main():
             # E20 : on reprend l'état final de l'épisode précédent (déjà détaché par la
             # dernière mise à jour), recentré sur l'origine pour la précision float32.
             recentrer(mega)
+            retours_au_repos(mega, cfg.proba_retour_repos, nouvelle_physique)   # E20b
         else:
             mega = nouvelle_physique()
             frame_globale = 0

@@ -139,3 +139,21 @@ def test_train2_refuses_chaining_without_per_window_updates(tmp_path):
          "--dossier-champion-raffine", str(tmp_path)],
         cwd=RACINE, capture_output=True, text=True, timeout=120)
     assert res.returncode != 0 and "maj-par-fenetre" in res.stderr
+
+
+@torch.no_grad()
+def test_return_to_rest_probability():
+    """E20b: p = 0 keeps every rollout, p = 1 sends every rollout back to the rest pose."""
+    _, cerveau, env = _env(4, 20)
+    torch.manual_seed(4)
+    obs = env.reset()
+    done = False
+    while not done:
+        obs, _, done = env.step(cerveau(obs))
+    vx = env.mega.vX.clone()
+    env.nouvelle_tranche(0.0)
+    assert not env.retours.any() and torch.equal(env.mega.vX, vx)
+    env.nouvelle_tranche(1.0)
+    assert env.retours.all()
+    assert torch.count_nonzero(env.mega.vX) == 0                       # repos : vitesses nulles
+    assert torch.allclose(env.mega.target_length, env.mega.base_length)

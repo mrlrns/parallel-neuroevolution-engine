@@ -58,6 +58,7 @@ detachement_complet: false    # E12 contrôle : troncature complète, toujours u
 physique_compilee: false      # true sur GPU : MegaCreaFast + torch.compile, même physique, ×3–4
 episodes_enchaines: false     # E20 : chaque épisode repart de l'état final du précédent (train2 : avec maj_par_fenetre)
 frames_selection: 300         # horizon de l'évaluation qui choisit le meilleur checkpoint (900 en E20)
+proba_retour_repos: 0.0       # E20b : proba qu'un rollout reparte du repos à chaque épisode enchaîné (0.1 en E20b)
 train2_frame_nb: 300         # horizon phase 2, distinct de frame_nb (phase 1)
 
 # ---------- baselines/ppo.py (baseline PPO sur la morphologie figée) ----------

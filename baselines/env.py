@@ -59,14 +59,11 @@ def recentrer(mega):
 
 
 @torch.no_grad()
-def reinitialiser_explosions(mega, fabrique):
-    """Remet au repos les rollouts dont l'état n'est plus fini. Retourne leur masque [n] (bool).
+def reinitialiser_rollouts(mega, casses, fabrique):
+    """Remet au repos les rollouts du masque `casses` [n] (bool), sans toucher aux autres.
 
     `fabrique()` construit un objet physique neuf de même taille : on recopie ses
     lignes (état au repos, bruit initial compris) dans les rollouts concernés."""
-    fini = torch.isfinite(mega.X).all(dim=2) & torch.isfinite(mega.Y).all(dim=2) \
-        & torch.isfinite(mega.vX).all(dim=2) & torch.isfinite(mega.vY).all(dim=2)   # [1, n]
-    casses = ~fini[0]
     if not bool(casses.any()):
         return casses
     neuf = fabrique()
@@ -81,6 +78,27 @@ def reinitialiser_explosions(mega, fabrique):
         masque = casses.view(1, -1, *([1] * (val.dim() - 2)))
         setattr(mega, nom, torch.where(masque, frais, val))
     return casses
+
+
+@torch.no_grad()
+def reinitialiser_explosions(mega, fabrique):
+    """Remet au repos les rollouts dont l'état n'est plus fini. Retourne leur masque [n] (bool)."""
+    fini = torch.isfinite(mega.X).all(dim=2) & torch.isfinite(mega.Y).all(dim=2) \
+        & torch.isfinite(mega.vX).all(dim=2) & torch.isfinite(mega.vY).all(dim=2)   # [1, n]
+    return reinitialiser_rollouts(mega, ~fini[0], fabrique)
+
+
+@torch.no_grad()
+def retours_au_repos(mega, proba, fabrique):
+    """E20b : chaque rollout repart du repos avec probabilité `proba`. Retourne le masque [n].
+
+    Sans retour au repos, la politique ne part du repos qu'une fois (au tout début, encore
+    aléatoire) et n'apprend jamais à démarrer (E20) ; avec proba p, un coup unique ne rapporte
+    qu'une fois toutes les ≈ 1/p tranches, contre à chaque tranche pour une vraie nage."""
+    n = mega.X.shape[1]
+    tirage = torch.rand(n, device=mega.X.device) < proba if proba > 0 else \
+        torch.zeros(n, dtype=torch.bool, device=mega.X.device)
+    return reinitialiser_rollouts(mega, tirage, fabrique)
 
 
 @torch.no_grad()
@@ -153,14 +171,16 @@ class SwimEnv:
         return self.mega.get_observation(0)[0]                        # [n, obs]
 
     @torch.no_grad()
-    def nouvelle_tranche(self):
+    def nouvelle_tranche(self, proba_retour_repos=0.0):
         """E20 : nouvel épisode qui reprend l'état final du précédent (pas de retour au repos).
 
         Seuls le compteur de frames de l'épisode, le point de départ du déplacement et le
-        compteur de remises au repos repartent de zéro ; l'horloge des observations continue."""
+        compteur de remises au repos repartent de zéro ; l'horloge des observations continue.
+        E20b : chaque rollout repart du repos avec probabilité `proba_retour_repos`."""
         if self.mega is None:
             return self.reset()
         recentrer(self.mega)
+        self.retours = retours_au_repos(self.mega, proba_retour_repos, self._neuf)
         self.frame = 0
         self.nb_reinit = 0
         self.pos_depart = self.barycentre_x().clone()
