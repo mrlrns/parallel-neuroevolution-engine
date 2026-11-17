@@ -17,9 +17,9 @@ import torch
 from PIL import Image, ImageDraw
 
 from baselines.env import SwimEnv
-from brain import Brain
 from champion import charger_champion
 from config import Config
+from politiques import politique_depuis_checkpoint
 
 FOND, GRILLE, OS_, MUSCLE, NOEUD, TRACE, TEXTE = (
     (14, 30, 48), (32, 58, 82), (235, 235, 235), (225, 70, 70), (255, 255, 255), (90, 170, 220), (200, 215, 230))
@@ -28,9 +28,7 @@ FOND, GRILLE, OS_, MUSCLE, NOEUD, TRACE, TEXTE = (
 @torch.no_grad()
 def simuler(chemin, frames, seed, bruit, cfg):
     ch = charger_champion(chemin, torch.device("cpu"))
-    cerveau = Brain(ch.obs_size, ch.action_size)
-    cerveau.load_state_dict(ch.brain_weights)
-    cerveau.eval()
+    politique = politique_depuis_checkpoint(torch.load(chemin, map_location="cpu"), ch, torch.device("cpu"))
     torch.manual_seed(seed)
     env = SwimEnv(ch.dico, 1, frames, cfg.sub_step, cfg.coef_energie, cfg.coef_hauteur,
                   torch.device("cpu"), v_max=cfg.v_max, water_drag=cfg.water_drag)
@@ -39,7 +37,7 @@ def simuler(chemin, frames, seed, bruit, cfg):
     etats = [(env.mega.X[0, 0, :n].clone(), env.mega.Y[0, 0, :n].clone())]
     done = False
     while not done:
-        a = cerveau(obs)
+        a = politique(obs, env.frame_globale)
         # une décision = 5 frames : on enregistre chaque frame en avançant la physique à la main
         env.mega.apply_action((a + torch.randn_like(a) * bruit).clamp(-1, 1).unsqueeze(0), env.frame_globale)
         for _ in range(5):
