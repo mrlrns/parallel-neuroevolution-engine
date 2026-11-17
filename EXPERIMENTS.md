@@ -863,7 +863,7 @@ valid as an optimisation result, but the objective (λ = 1) turned out not to pr
 swimming: rerun at λ = 0.3 planned (E18b).
 
 **Setup.** Clean physics (`sub_step = 20`, no clip, `water_drag = 0.005`), reward of E16
-with λ = 1 (energy cost negligible: `coef_energie = 10 000` makes it ≈ 0.3% of progress),
+with λ = 1 (energy cost negligible: `coef_energie = 10 000` makes it 0.3–2 % of progress),
 reference morphology, random initial controller, 150 episodes of train2 = 150 PPO
 iterations (identical simulation budget, 1.8·10⁹ physics sub-steps × rollouts),
 seeds 0–2, compiled physics, Colab T4 (`colab/E18_clean_comparison.ipynb`, part B).
@@ -942,7 +942,7 @@ runs pending).
 
 | | train2 (seeds 0/1/2) | PPO (seeds 0/1/2) |
 |---|---|---|
-| displacement, 300 frames (100 rollouts) | 63.5 / 61.8 / 62.2 | **158.5 / 154.2 / 150.4** |
+| displacement, 300 frames (50 rollouts) | 63.5 / 61.8 / 62.2 | **158.5 / 154.2 / 150.4** |
 | saturated commands | 56% / 55% / 58% | 2% / 2% / 0% |
 | mean \|Δa\| | 0.034 | 0.30 / 0.20 / 0.23 |
 | cumulative displacement at 1500 frames | ≈ 61 (all moved by frame 150) | **525** / 182 / 166 |
@@ -1005,6 +1005,50 @@ eel wave ≈ 14 (E17). `docs/rameur_open_loop.gif`.
 
 **Next.** PPO, λ = 0.3, 150 iterations, judged with `tools/horizon_check.py` against
 the reference at the same λ (E18b).
+
+---
+
+## E20 — Chained episodes: the incentive is fixed, but nobody learns to start
+
+**Date:** 2026/11/04 — **Status:** complete, 3 training seeds per method. Negative result;
+follow-up E20b planned.
+
+**Setup.** E18b (λ = 0.3, 150 episodes, train2 with per-window updates) plus
+`--episodes-enchaines`: every 300-frame episode resumes from the final state of the
+previous one (body re-centred), never from rest; best checkpoint selected on 900 frames
+from rest (`--frames-selection 900`) for both methods. `results/E20/` (two interrupted
+sessions moved to `runs_interrompus/`). No rollout exploded (`nb_reinit` = 0 throughout).
+
+![E20](docs/E20_comparison.png)
+
+| | train2 (seeds 0/1/2) | PPO (seeds 0/1/2) |
+|---|---|---|
+| reward per training chunk, last 10 | −1.3 / −1.0 / −1.2 | 13 / 25 / **54** |
+| displacement per training chunk, last 10 | 0 / 0 / 0 | 18 / 32 / **61** |
+| replayed from rest, cumulative at 1500 frames | 54 / 52 / 35 | 26 / 43 / 41 |
+| late / early speed from rest | 0.00 | ≤ 0.02 |
+
+**Reading.**
+1. **The incentive works for PPO — inside the chain.** Its per-chunk reward rises steadily
+   to the end (still linear at 150 iterations): in the chained training distribution it
+   swims continuously, up to 61 per 300 frames.
+2. **But no policy can start from rest.** Replayed from the rest pose, the same PPO
+   policies move 26–43 and stop. Not an exploration-noise effect: with noise 0.15 instead
+   of 0.02 the picture is the same (`tools/horizon_check.py --bruit`). Without resets, each
+   rollout starts from rest exactly once, at iteration 0, with a random policy; afterwards
+   the policy only ever sees established-gait states. It learned to keep swimming, never
+   to start. (The "never reset" choice was ours; it was the wrong one.)
+3. **train2 freezes in the first chunks and never recovers** (0 displacement per chunk,
+   reward −1 from the penalties alone), as predicted from E18: its tanh outputs saturate,
+   so the analytic gradient is ≈ 0 in frozen states. Its "best" checkpoint is a one-off
+   (≈ 50 from rest, all within the first 150 frames): 900 frames were not long enough to
+   rank a one-off below PPO's still slow sustained gaits.
+
+**Next.** E20b: at each new chunk every rollout returns to rest with probability p = 0.1
+(`--proba-retour-repos 0.1`, notebook part E): the policy practises starting, while a
+one-off still pays only once every ≈ 10 chunks against every chunk for a real gait.
+E21 (train2 only): a penalty β·mean(z²) on the pre-tanh outputs to keep the analytic
+gradient alive, β ∈ {0.01, 0.1}.
 
 ---
 

@@ -2,17 +2,50 @@
 
 ![CI](https://github.com/mrlrns/parallel-neuroevolution-engine/actions/workflows/ci.yml/badge.svg)
 
-## ⚠️ Status — results being re-established
+## 📊 Main result — gradients through the simulator vs PPO
 
-A numerical convergence test (E12 in [EXPERIMENTS.md](EXPERIMENTS.md)) showed that the
-original integration step (`sub_step = 10`) is unstable: a creature **at rest** drifts
-forward, and learned controllers exploit the artefact — PPO with chattering
-bang-bang commands, gradient-based learning to a lesser extent. Physics converges from
-`sub_step = 20`, now the default, where a simple open-loop wave already swims.
-A second test (E14) showed that the ±20 node-velocity clip also produced thrust —
-PPO's next gait relied on it — so it is removed by default (the physics is stable
-without it). Controllers are being retrained; numbers below this section predate
-these fixes and are kept as a record.
+![E18b](docs/E18b_comparison.png)
+
+*Reference morphology, random initial controller, 3 training seeds per method, equal
+simulation budget (1.8 × 10⁹ physics sub-steps × rollouts). Thin lines: individual seeds.*
+
+| 300 frames, 50 rollouts | gradient through the simulator (`train2.py`) | PPO (`baselines/ppo.py`) |
+|---|---|---|
+| displacement (seeds 0/1/2) | 63.5 / 61.8 / 62.2 | **158.5 / 154.2 / 150.4** |
+| commands saturated at ±1 | 55–58 % | 0–2 % |
+
+At equal budget PPO beats the best variant of gradient-based learning through the
+differentiable simulator by ≈ 2.5× on every seed and is still improving. The
+gradient-based learner — truncated BPTT with one Adam step per 10-frame window, ×4.5
+over one step per episode (E13) — plateaus at the same level whatever the reward
+shaping (E18, E18b). The reason is identified: more than half of its tanh outputs are
+saturated, where the analytic gradient is ≈ 0. Full protocol and numbers: E13, E18,
+E18b in [EXPERIMENTS.md](EXPERIMENTS.md). (The earlier ×15 result, E11, was obtained in
+an unstable physics and is superseded.)
+
+## ⚠️ Open problem — sustained swimming
+
+The training reward is the net displacement over 300 frames from rest. Nothing in it
+requires the motion to *continue*: replayed over 1500 frames
+([`tools/horizon_check.py`](tools/horizon_check.py)), most learned controllers move once
+and freeze shortly after the training horizon (E16 correction, E18; one PPO seed in three
+keeps swimming at λ = 0.3, E18b). Chaining the training episodes (E20) fixes the
+incentive — PPO then swims continuously inside the chain — but the policies no longer
+learn to start from rest, and the gradient-based learner freezes. In progress: E20b
+(chained episodes with 10 % returns to rest) and E21 (a penalty on pre-tanh outputs to
+keep train2's gradient alive).
+
+Two control morphologies frame the question of body design: a hand-built eel (E17) and a
+**rower designed from the drag model** (E19, [`tools/rameur.py`](tools/rameur.py)) whose
+open-loop stroke already swims steadily and reverses when the stroke phase reverses.
+
+## 🔧 Physics validation (E12, E14)
+
+A numerical convergence test showed that the original integration step
+(`sub_step = 10`) was unstable: a creature **at rest** drifted forward, and learned
+controllers exploited the artefact. Physics converges from `sub_step = 20`, now the
+default. A second test showed that the ±20 node-velocity clip also produced thrust that
+PPO exploited; it is removed by default (the physics is stable without it).
 
 | open-loop command, reference morphology, 300 frames | sub_step 10 | 20 | 40 | 80 |
 |---|---|---|---|---|
@@ -20,23 +53,19 @@ these fixes and are kept as a record.
 | slow travelling wave | 54.7 | 26.4 | 28.3 | 26.4 |
 | bang-bang | **228.8** | 30.5 | 32.1 | 22.8 |
 
+**Known limitation.** The reference morphology itself comes from phase 1 (evolution),
+which ran in the original physics; phase 1 has not been re-run since the fixes.
+
 ## 🚀 Overview
 
 This repository implements a custom, fully vectorized 2D physics engine built from scratch in PyTorch to simulate soft-body aquatic creatures.
 
 Instead of relying on standard loops or pre-built engines, this project leverages `torch.func.vmap` to achieve **massively parallel neural network evaluations**. By vectorizing both the physics simulation and the Brain (Multi-Layer Perceptron), the engine evaluates 50 morphologies × 30 concurrent rollouts in a single batched pass.
 
-## 📊 Results so far (unstable integration regime, `sub_step = 10`)
+## 🔬 Earlier bugs (E1–E10)
 
-At equal simulation budget, PPO beat gradient-based learning through the simulator
-by ×15 in reward (E11, 3 seeds each) — a comparison that holds within that
-simulator, but whose displacements E12 showed to be largely numerical. Re-running E11
-at `sub_step = 20` is the next step.
-
-## 🔬 How we got there
-
-Four compounding specification and implementation bugs had to be found first. Full
-log in [EXPERIMENTS.md](EXPERIMENTS.md).
+Before the comparisons above, four compounding specification and implementation bugs
+had to be found. Full log in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 **Champion weights were saved after the optimiser step**, so every archived
 champion was a post-update, degraded version of the policy that had earned the
@@ -97,17 +126,20 @@ A weaker tangential component (30% of the normal coefficient) is applied along t
 
 Each creature is controlled by a PyTorch Neural Network taking relative node coordinates, velocities, current muscle contraction and a rhythmic clock signal as inputs. The network outputs target muscle contractions, which set the resting length of the springs.
 
-The control loop runs at a lower rate than the physics: the policy is queried **every 5 frames**, and each frame integrates **10 physics sub-steps** (`sub_step`). A new command therefore holds for 50 integration steps, which keeps the backpropagation graph tractable and forces the controller to produce sustained deformations rather than per-step corrections.
+The control loop runs at a lower rate than the physics: the policy is queried **every 5 frames**, and each frame integrates **20 physics sub-steps** (`sub_step`; 10 before E12 showed it unstable). A new command therefore holds for 100 integration steps, which keeps the backpropagation graph tractable and forces the controller to produce sustained deformations rather than per-step corrections.
 
 ### 4. Optimisation Loop
 
 Two nested processes run together:
 
 - **Evolutionary search over morphology** — insertion of a mirrored node pair, deletion of a mirrored node pair (with index remapping and a BFS connectivity check), link retyping (bone ↔ muscle) and length perturbation, all constrained to preserve bilateral symmetry. Elitist selection keeps the top half of the population each generation; each survivor produces one mutated child.
-- **Gradient-based controller learning** — rewards are backpropagated *through* the differentiable physics simulator. Training uses truncated BPTT (10-frame window), gradient-norm clipping (`max_norm = 10`), and automatic detection and recovery from numerical divergence (NaN check every 20 frames plus a finiteness check on the loss before `backward()`, episode discarded and graph freed).
+- **Gradient-based controller learning** — rewards are backpropagated *through* the differentiable physics simulator. Training uses truncated BPTT (10-frame window), gradient-norm clipping (`max_norm = 10`), and automatic detection and recovery from numerical divergence (NaN check every 20 frames plus a finiteness check on the loss before `backward()`, episode discarded and graph freed). In phase 2 the comparisons use one Adam step per window (`--maj-par-fenetre`, E13) with the graph fully cut at window boundaries.
 
 The two phases optimise the **same objective**: displacement with a constant energy
-penalty (`coef_energie = 10000`, `coef_hauteur = 0` throughout). An earlier version
+penalty (`coef_energie = 10000`, `coef_hauteur = 0` throughout). The energy term is
+divided by `coef_energie`, so in practice it is 0.3–2 % of progress — energy is nearly
+free. The shaping term that matters in the current experiments is the smoothness penalty
+λ·Σ(a_t − a_{t−1})² on muscle commands (`coef_regularite`, λ = 0.3; E16). An earlier version
 switched the objective mid-run — a curriculum — which made scores incomparable
 across generations for a measured effect of −1.2%; it was removed. Phase 2 differs
 from phase 1 only in that the morphology is frozen, the batch is much larger, the
@@ -119,6 +151,7 @@ re-instantiated.
 | File | Role |
 |---|---|
 | `megaVecto.py` | Vectorised physics engine: springs, damping, hydrodynamic drag, observations, reward |
+| `megaVecto_fast.py` | Same physics with incidence-matrix products instead of `scatter_add_` (bit-identical GPU reruns) and optional `torch.compile` (×3–4) |
 | `individu.py` | Creature genome: topology and mutation operators (bilateral symmetry enforced) |
 | `brain.py` | MLP controller (3 layers, tanh output) |
 | `train.py` | Phase 1 — evolutionary topology search with controller learning |
@@ -130,11 +163,19 @@ re-instantiated.
 | `evaluate_seeds.py` | Sweeps initial-condition seeds for a champion, ranks them by displacement |
 | `verify_reproducibility.py` | Replays a champion under exact phase-1 training conditions to check its announced score |
 | `champion.py` | Loads a saved champion and rebuilds its padded single-creature tensors |
-| `baselines/env.py` | `SwimEnv`: the physics wrapped as a vectorised RL environment (no gradient) |
+| `baselines/env.py` | `SwimEnv`: the physics wrapped as a vectorised RL environment (no gradient); chained episodes and returns to rest (E20) |
 | `baselines/check_env.py` | Proves `SwimEnv` reproduces the `train2.py` loop exactly — run before any baseline |
 | `baselines/ppo.py` | PPO baseline on the frozen morphology, same simulation budget as `train2.py` |
-| `baselines/compare.py` | Plots reward vs simulation budget, mean ± std over training seeds |
-| `tools/mp4_to_gif.py` | Converts a `visualize.py` video into the README GIF |
+| `baselines/compare.py` | Plots reward vs simulation budget: each training seed plus their mean; two panels with `--enchaines` |
+| `tools/horizon_check.py` | Replays checkpoints far beyond the training horizon: does the gait keep going? |
+| `tools/diagnose_gait.py` | Gait statistics: command saturation, chattering, vertical drift, energy per progress |
+| `tools/convergence_test.py` | Open-loop commands across integration steps (the E12 test) |
+| `tools/benchmark_physics.py` | Equivalence and speed of `megaVecto.py` vs `megaVecto_fast.py` |
+| `tools/eel_control.py`, `tools/rameur.py` | Hand-built control morphologies (eel, rower) with open-loop sweeps |
+| `tools/mp4_to_gif.py` | Converts a `visualize.py` video into a GIF |
+| `colab/` | GPU notebooks: `E18_clean_comparison.ipynb` (current protocol), `baseline_runs.ipynb` (E11, historical) |
+| `results/` | Training logs of the reported runs (`runs/*.jsonl`); checkpoints are not tracked |
+| `tests/` | Pytest suite (physics, environment equivalence, PPO, train2 modes, chained episodes), run in CI |
 | `EXPERIMENTS.md` | Experiment log: hypotheses, settings, outcomes — negative results kept |
 
 ## 🔧 Configuration
@@ -208,24 +249,26 @@ simulation budget**, not per episode.
 # 1. The environment must reproduce train2.py exactly (exits with an error otherwise)
 python -m baselines.check_env --chemin-champion champion_raffine/reference.pt
 
-# 2. Both methods from a random brain, 3 training seeds each (GPU)
+# 2. Both methods from a random brain, 3 training seeds each (GPU) — E18b settings
+COMMUN="--poids-aleatoires --coef-regularite 0.3 --physique-compilee"
 for s in 0 1 2; do
-  python train2.py        --chemin-champion champion_raffine/reference.pt --poids-aleatoires --seed $s
-  python -m baselines.ppo --chemin-champion champion_raffine/reference.pt --poids-aleatoires --seed $s
+  python train2.py        --chemin-champion champion_raffine/reference.pt $COMMUN --maj-par-fenetre --nb-episodes 150 --seed $s
+  python -m baselines.ppo --chemin-champion champion_raffine/reference.pt $COMMUN --ppo-nb-iterations 150 --seed $s
 done
 
 # 3. Learning curves vs simulation budget
 python -m baselines.compare --diffsim "runs/train_phase2_seed*.jsonl" \
-                            --ppo "runs/ppo_seed*.jsonl" --sortie docs/baseline_ppo.png
+                            --ppo "runs/ppo_seed*.jsonl" --lineaire --sortie docs/comparison.png
 
-# 4. Final verdict: identical evaluation for every checkpoint
+# 4. Same judge for every checkpoint: 20 seeds × 1000 frames, then far beyond the horizon
 python evaluate_seeds.py --chemin-champion baselines_out/ppo_seed0_best.pt --nb-seeds 20
+python -m tools.horizon_check baselines_out/ppo_seed*_best.pt champion_raffine/FINAL_seed*.pt
 ```
 
-On Colab: [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrlrns/parallel-neuroevolution-engine/blob/main/colab/E18_clean_comparison.ipynb) — runs the current protocol on a GPU (clean physics: E13 pilot, E18 comparison at λ = 1, **E18b at λ = 0.3, part C**) and writes every output to Google Drive.
+On Colab: [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrlrns/parallel-neuroevolution-engine/blob/main/colab/E18_clean_comparison.ipynb) — runs the current protocol on a GPU (clean physics: E13 pilot, E18 at λ = 1, E18b at λ = 0.3, E19 rower, E20 chained episodes, E20b returns to rest) and writes every output to Google Drive.
 The original E11 notebook, run in the physics later found to be unstable (E12), is kept in [`colab/baseline_runs.ipynb`](colab/baseline_runs.ipynb) for the record.
 
-Results: E13 and E18 in [EXPERIMENTS.md](EXPERIMENTS.md) (E11 is superseded).
+Results: E13, E18, E18b and E20 in [EXPERIMENTS.md](EXPERIMENTS.md) (E11 is superseded).
 
 ### Evaluation
 
@@ -240,6 +283,8 @@ python evaluate_seeds.py --chemin-champion champion_raffine/reference.pt --nb-se
 `--chemin-champion` can be set once in `config.yaml` (`chemin_champion:`) instead
 of being repeated on every command.
 
-> **Note:** training checkpoints and exported videos are not tracked, with the
-> single exception of `champion_raffine/reference.pt`. Run `train.py` to produce
-> your own.
+> **Note:** training checkpoints and exported videos are not tracked, except
+> `champion_raffine/reference.pt` (the evolved reference morphology) and
+> `champion_raffine/rameur.pt` (the hand-designed rower, no trained controller). Training
+> logs of the reported runs are kept under `results/*/runs/`. Run `train.py` to produce
+> your own champions.
