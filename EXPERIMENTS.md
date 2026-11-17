@@ -1003,8 +1003,19 @@ shoulder and wrist reverses**: genuine non-reciprocal propulsion, not a transien
 scale, the open-loop wave on the reference gave ≈ 27 in 300 frames (E12) and the best
 eel wave ≈ 14 (E17). `docs/rameur_open_loop.gif`.
 
-**Next.** PPO, λ = 0.3, 150 iterations, judged with `tools/horizon_check.py` against
-the reference at the same λ (E18b).
+**PPO on the rower** (2026/11/17; λ = 0.3, 150 iterations, seed 0, random init, CPU;
+`results/E19_rameur/`). Replayed from rest (`tools/horizon_check.py`, 12 rollouts):
+
+| | 150 | 300 | 600 | 1000 | 1500 frames | late / early speed |
+|---|---|---|---|---|---|---|
+| rower + PPO λ = 0.3 | 44 | 95 | 193 | 322 | **481** | **1.09** |
+
+The first controller of the project that starts from rest and never stops: constant
+speed to 1500 frames (≈ 3.4 body lengths, as fast per body length as the best reference
+controller, E16 λ = 0.3). But the gait is visually poor: the commands still jump between
+decisions (|Δa| = 0.38), and PPO drives the two oars out of phase, so the body tilts by
+≈ 20–30° and limps. A smooth imposed stroke on the same body is clean
+(`tools/rameur.py`): the remaining problem is the learned command, not the body (E22).
 
 ---
 
@@ -1049,6 +1060,55 @@ sessions moved to `runs_interrompus/`). No rollout exploded (`nb_reinit` = 0 thr
 one-off still pays only once every ≈ 10 chunks against every chunk for a real gait.
 E21 (train2 only): a penalty β·mean(z²) on the pre-tanh outputs to keep the analytic
 gradient alive, β ∈ {0.01, 0.1}.
+
+---
+
+## E22 — Structured commands: mirror symmetry and a rhythmic policy
+
+**Date:** 2026/11/18 — **Status:** complete, 1 seed per variant (rower, PPO, λ = 0.3,
+150 iterations, Colab T4, `results/E22/`).
+
+**Question.** The rower + PPO gait (E19) swims but jerks and limps. Can the *form* of the
+command fix it, rather than a penalty (which, from λ ≈ 1, makes policies stop: E16, E18)?
+
+**Two options** (`politiques.py`, off by default):
+- `--symetrie`: muscles mapped onto each other by the body's mirror symmetry (pairs found
+  from the geometry) share one command. For a Brain the symmetry is applied to the
+  pre-activations, so the checkpoint is saved as an ordinary Brain with averaged rows and
+  every tool reads it.
+- `--politique-rythmique`: the command is MLP(sin φ, cos φ) with φ = 2π·frame/T. It is a
+  smooth, T-periodic function of time by construction and ignores the body state (a learned
+  open-loop pattern, as in central pattern generators; Ijspeert, 2008). The critic still
+  sees the state and the phase.
+
+**Results** (replayed from rest, `tools/horizon_check.py`, 12 rollouts; gait from
+`tools/diagnose_gait.py`, 30 rollouts × 300 frames).
+
+| | 300 frames | 1500 frames | late / early speed | vertical drift | aspect (`docs/gif_candidats/`) |
+|---|---|---|---|---|---|
+| E19: free PPO | 95 | **481** | 1.09 | 12 | jerky, limping, tilted |
+| A: PPO + symmetry | 91 | 318 | 0.45 | −3 | still tilts, slows down |
+| rhythmic T = 20 | 91 | 295 | 0.30 | 5 | slows down |
+| **rhythmic T = 40** | 76 | **364** | **0.92** | 0.1 | **clean, symmetric, straight** |
+| rhythmic T = 80 | 43 | 212 | 1.00 | −0.6 | clean but slow |
+
+**Reading.**
+1. **Symmetry alone does not hold.** Identical commands on both oars still let the body
+   tilt and the speed decay: a symmetric gait is unstable, small initial differences grow,
+   and a state-dependent policy does not correct them.
+2. **The rhythmic policy with T = 40 gives the first clean learned gait**: both oars
+   stroke together, the body stays level, and the speed holds to 1500 frames. It costs
+   ≈ 25 % speed against the jerky free policy (364 vs 481) — the trade-off accepted for
+   the README demonstration (`docs/swim_rower.gif`).
+3. **The period matters**: slow strokes (T = 80) give little thrust in this water; fast
+   ones (T = 20) lose speed over time (probably a slow heading drift, not checked).
+4. |Δa| barely drops (0.35 at T = 40) and is the wrong measure here: a sine of period 40
+   sampled every 5 frames changes by ≈ 0.3 between decisions by construction. The
+   difference is in the shape of the command (smooth and periodic), visible in the GIFs.
+
+**Caveats.** One seed per variant; the rhythmic policy is open loop (it cannot react to a
+perturbation); `evaluate_seeds.py` and `visualize.py` do not read rhythmic checkpoints yet
+(`horizon_check`, `diagnose_gait` and `render_gif` do).
 
 ---
 

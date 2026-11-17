@@ -2,6 +2,23 @@
 
 ![CI](https://github.com/mrlrns/parallel-neuroevolution-engine/actions/workflows/ci.yml/badge.svg)
 
+![A hand-designed rower swimming with a rhythmic policy learned by PPO](docs/swim_rower.gif)
+
+*Hand-designed rower morphology, rhythmic mirror-symmetric policy learned by PPO, in the
+validated physics (E19, E22). Grid fixed in the water frame; blue line: trajectory of the
+centre of mass.*
+
+**Key findings**
+
+- A GPU-vectorised, differentiable 2D mass-spring simulator written from scratch in PyTorch,
+  with bit-identical GPU reruns and a `torch.compile` path (×3–4).
+- At equal simulation budget, PPO beats learning by backpropagation through the simulator
+  by ≈ 2.5× on every seed; the gradient-based learner plateaus because more than half of its
+  tanh outputs saturate, where the analytic gradient vanishes (E13, E18, E18b).
+- Learned controllers exploited two simulation artefacts — an unstable integration step and
+  a velocity clip that created thrust; both were diagnosed with open-loop controls and
+  removed (E12, E14).
+
 ## 📊 Main result — gradients through the simulator vs PPO
 
 ![E18b](docs/E18b_comparison.png)
@@ -34,6 +51,12 @@ incentive — PPO then swims continuously inside the chain — but the policies 
 learn to start from rest, and the gradient-based learner freezes. In progress: E20b
 (chained episodes with 10 % returns to rest) and E21 (a penalty on pre-tanh outputs to
 keep train2's gradient alive).
+
+On a body designed for this physics the problem largely disappears: PPO on the rower
+swims at constant speed from rest (E19), and a **rhythmic policy** — the command depends
+only on the phase of a swimming clock, with mirror muscles sharing one command — gives
+the clean, symmetric stroke shown at the top (E22), at ≈ 25 % less speed than the
+unconstrained, jerky policy.
 
 Two control morphologies frame the question of body design: a hand-built eel (E17) and a
 **rower designed from the drag model** (E19, [`tools/rameur.py`](tools/rameur.py)) whose
@@ -171,6 +194,8 @@ re-instantiated.
 | `tools/diagnose_gait.py` | Gait statistics: command saturation, chattering, vertical drift, energy per progress |
 | `tools/convergence_test.py` | Open-loop commands across integration steps (the E12 test) |
 | `tools/benchmark_physics.py` | Equivalence and speed of `megaVecto.py` vs `megaVecto_fast.py` |
+| `politiques.py` | Structured commands (E22): mirror-symmetric policies and rhythmic policies that depend only on a swimming clock |
+| `tools/render_gif.py` | Demonstration GIF of a checkpoint, camera following the creature |
 | `tools/eel_control.py`, `tools/rameur.py` | Hand-built control morphologies (eel, rower) with open-loop sweeps |
 | `tools/mp4_to_gif.py` | Converts a `visualize.py` video into a GIF |
 | `colab/` | GPU notebooks: `E18_clean_comparison.ipynb` (current protocol), `baseline_runs.ipynb` (E11, historical) |
@@ -268,7 +293,7 @@ python -m tools.horizon_check baselines_out/ppo_seed*_best.pt champion_raffine/F
 On Colab: [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mrlrns/parallel-neuroevolution-engine/blob/main/colab/E18_clean_comparison.ipynb) — runs the current protocol on a GPU (clean physics: E13 pilot, E18 at λ = 1, E18b at λ = 0.3, E19 rower, E20 chained episodes, E20b returns to rest) and writes every output to Google Drive.
 The original E11 notebook, run in the physics later found to be unstable (E12), is kept in [`colab/baseline_runs.ipynb`](colab/baseline_runs.ipynb) for the record.
 
-Results: E13, E18, E18b and E20 in [EXPERIMENTS.md](EXPERIMENTS.md) (E11 is superseded).
+Results: E13, E18, E18b, E19, E20 and E22 in [EXPERIMENTS.md](EXPERIMENTS.md) (E11 is superseded).
 
 ### Evaluation
 

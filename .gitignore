@@ -24,3 +24,4 @@ videos_ia*/
 !results/E19_rameur/runs/
 # GIF candidats (lourds), seul le GIF retenu va dans docs/
 docs/gif_candidats/
+!results/E22/*/runs/
