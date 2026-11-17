@@ -105,6 +105,7 @@ def retours_au_repos(mega, proba, fabrique):
 def evaluer_politique(politique, dico, n, frames, cfg, device):
     """Rollout quasi-déterministe depuis le repos (politique(obs) + bruit `bruit_test`).
 
+    `politique(obs, frame_globale)` : la frame sert aux politiques rythmiques (E22).
     Sert à choisir le meilleur checkpoint, pour PPO comme pour train2 : avec
     frames > horizon d'entraînement, un coup unique ne peut plus l'emporter (E20).
     Retourne (récompense moyenne, déplacement moyen). Hors budget `sim_steps`."""
@@ -115,7 +116,7 @@ def evaluer_politique(politique, dico, n, frames, cfg, device):
     total = torch.zeros(env.n, device=device)
     done = False
     while not done:
-        a = politique(obs)
+        a = politique(obs, env.frame_globale)
         obs, r, done = env.step(a + torch.randn_like(a) * cfg.bruit_test)
         total += r
     return total.mean().item(), env.deplacement().mean().item()

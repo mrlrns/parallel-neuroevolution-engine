@@ -27,6 +27,12 @@ nulle en fin de tranche : seule la correction « pas de retour au repos » chang
 même que pour train2. Le meilleur checkpoint est choisi sur `frames_selection` frames
 depuis le repos (900 en E20) pour qu'un coup unique ne puisse pas l'emporter.
 
+Structures de commande (E22, politiques.py, désactivées par défaut) :
+  --symetrie            une commande par groupe de muscles miroirs ; le checkpoint reste
+                        un Brain ordinaire (lignes moyennées par groupe)
+  --politique-rythmique la commande ne dépend que de (sin φ, cos φ), φ = 2π·frame/T ;
+                        le critique voit l'état ET la phase ; checkpoint avec une clé 'politique'
+
 Usage :
     python -m baselines.ppo --chemin-champion champion_raffine/reference.pt --poids-aleatoires --seed 0
 """
@@ -44,6 +50,7 @@ from brain import Brain
 from champion import charger_champion
 from config import Config, build_argparser, load_config
 from logger import Logger
+from politiques import BrainSymetrique, PolitiqueRythmique, Symetriseur, ajouter_phase, groupes_symetrie
 
 
 class Critique(nn.Module):
@@ -65,12 +72,50 @@ class Critique(nn.Module):
 
 
 class Agent(nn.Module):
-    def __init__(self, obs_size, action_size, masque_actions, std_init):
+    def __init__(self, obs_size, action_size, masque_actions, std_init, sym=None, periode=None):
+        """sym : Symetriseur ou None ; periode : None (Brain) ou période de la politique rythmique.
+
+        La distribution porte sur les sorties de l'acteur : une par muscle (Brain), ou une par
+        groupe miroir (symétrie). Les sorties sans effet (os, fantômes) sont masquées."""
         super().__init__()
-        self.acteur = Brain(obs_size, action_size)
-        self.critique = Critique(obs_size)
-        self.log_std = nn.Parameter(torch.full((action_size,), math.log(std_init)))
-        self.register_buffer("masque", masque_actions)   # [act], 1 = vrai muscle
+        self.sym = sym
+        self.periode = periode
+        n_sorties = sym.n_groupes if sym is not None else action_size
+        if periode is not None:
+            self.acteur = PolitiqueRythmique(n_sorties, periode)
+            obs_critique = obs_size + 2
+        elif sym is not None:
+            self.acteur = BrainSymetrique(obs_size, action_size, sym)
+            obs_critique = obs_size
+        else:
+            self.acteur = Brain(obs_size, action_size)
+            obs_critique = obs_size
+        self.critique = Critique(obs_critique)
+        self.log_std = nn.Parameter(torch.full((n_sorties,), math.log(std_init)))
+        masque = torch.ones(n_sorties) if sym is not None else masque_actions
+        self.register_buffer("masque", masque)   # 1 = sortie qui commande un vrai muscle
+
+    def observer(self, obs, frame):
+        """Ce que voient l'acteur et le critique : l'état, plus la phase pour la politique rythmique."""
+        return ajouter_phase(obs, frame, self.periode) if self.periode is not None else obs
+
+    def vers_env(self, action):
+        """Commande complète envoyée à l'environnement."""
+        return self.sym.etendre(action) if self.sym is not None else action
+
+    def checkpoint(self, champ):
+        """Dictionnaire sauvegardé, au format des .pt de train2 (+ clé 'politique' si besoin)."""
+        groupes = self.sym.groupes if self.sym is not None else None
+        if self.periode is not None:
+            d = champ.to_save_dict(None)
+            d["politique"] = {"type": "rythmique", "periode": self.periode, "groupes": groupes, "cache": 32,
+                              "etat": {k: v.detach().clone() for k, v in self.acteur.state_dict().items()}}
+            return d
+        if self.sym is not None:
+            d = champ.to_save_dict(self.acteur.poids_brain())
+            d["politique"] = {"type": "brain_symetrique", "groupes": groupes}
+            return d
+        return champ.to_save_dict({k: v.detach().clone() for k, v in self.acteur.state_dict().items()})
 
     def distribution(self, obs):
         moyenne = self.acteur(obs)
@@ -86,7 +131,9 @@ class Agent(nn.Module):
 def evaluer(agent, champ, cfg, device):
     """Rollout quasi-déterministe (moyenne + bruit `bruit_test`) sur `frames_selection` frames
     depuis le repos, sur un env séparé : n'entre pas dans le budget `sim_steps`."""
-    return evaluer_politique(agent.acteur, champ.dico, cfg.ppo_eval_n_envs, cfg.frames_selection, cfg, device)
+    def politique(obs, frame):
+        return agent.vers_env(agent.acteur(agent.observer(obs, frame)))
+    return evaluer_politique(politique, champ.dico, cfg.ppo_eval_n_envs, cfg.frames_selection, cfg, device)
 
 
 def entrainer(cfg: Config):
@@ -105,10 +152,23 @@ def entrainer(cfg: Config):
     T, N = env.nb_decisions, env.n
     obs_size, act_size = champ.obs_size, champ.action_size
 
-    agent = Agent(obs_size, act_size, champ.masque_muscles_actifs, cfg.ppo_std_init).to(device)
+    sym = None
+    if cfg.symetrie:
+        groupes = groupes_symetrie(champ.x, champ.y, champ.muscle1, champ.muscle2, champ.is_bone)
+        sym = Symetriseur(groupes, act_size)
+        print(f"Symétrie imposée : {len(groupes)} groupes de muscles {groupes}")
+    periode = cfg.periode_rythme if cfg.politique_rythmique else None
+    if periode is not None:
+        print(f"Politique rythmique : période {periode} frames")
+    agent = Agent(obs_size, act_size, champ.masque_muscles_actifs, cfg.ppo_std_init, sym, periode).to(device)
+    obs_dim = obs_size + 2 if periode is not None else obs_size
+    act_dim = agent.log_std.shape[0]
     if not cfg.poids_aleatoires and champ.brain_weights is not None:
-        agent.acteur.load_state_dict(champ.brain_weights)
-        print("Acteur initialisé avec les poids du champion")
+        if periode is not None:
+            print("Politique rythmique : les poids du champion (un Brain) ne s'appliquent pas, départ aléatoire")
+        else:
+            (agent.acteur.brain if sym is not None else agent.acteur).load_state_dict(champ.brain_weights)
+            print("Acteur initialisé avec les poids du champion")
     else:
         print("Acteur initialisé aléatoirement")
     optimizer = torch.optim.Adam(agent.parameters(), lr=cfg.ppo_lr, eps=1e-5)
@@ -124,12 +184,13 @@ def entrainer(cfg: Config):
                                              "physique_compilee", "v_max",
                                              "coef_regularite", "water_drag",
                                              "episodes_enchaines", "frames_selection",
-                                             "proba_retour_repos")}},
+                                             "proba_retour_repos", "symetrie", "politique_rythmique",
+                                             "periode_rythme")}},
     )
 
     # Tampons du rollout : [T, N, ...]
-    b_obs = torch.zeros(T, N, obs_size, device=device)
-    b_act = torch.zeros(T, N, act_size, device=device)
+    b_obs = torch.zeros(T, N, obs_dim, device=device)
+    b_act = torch.zeros(T, N, act_dim, device=device)
     b_logp = torch.zeros(T, N, device=device)
     b_rew = torch.zeros(T, N, device=device)
     b_val = torch.zeros(T, N, device=device)
@@ -147,9 +208,7 @@ def entrainer(cfg: Config):
             if eval_score > meilleur_eval:
                 meilleur_eval = eval_score
                 chemin_meilleur = f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_best.pt"
-                torch.save(champ.to_save_dict({k: v.detach().clone()
-                                               for k, v in agent.acteur.state_dict().items()}),
-                           chemin_meilleur)
+                torch.save(agent.checkpoint(champ), chemin_meilleur)
         else:
             eval_score = eval_depl = None
 
@@ -158,12 +217,13 @@ def entrainer(cfg: Config):
         obs = env.nouvelle_tranche(cfg.proba_retour_repos) if (cfg.episodes_enchaines and it > 0) else env.reset()
         with torch.no_grad():
             for t in range(T):
-                dist = agent.distribution(obs)
+                obs_pol = agent.observer(obs, env.frame_globale)
+                dist = agent.distribution(obs_pol)
                 action = dist.sample()
-                b_obs[t], b_act[t] = obs, action
+                b_obs[t], b_act[t] = obs_pol, action
                 b_logp[t] = agent.log_prob(dist, action)
-                b_val[t] = agent.critique(obs)
-                obs, r, _ = env.step(action)
+                b_val[t] = agent.critique(obs_pol)
+                obs, r, _ = env.step(agent.vers_env(action))
                 b_rew[t] = r
         sim_steps += env.sim_steps_par_episode
         score_episode = b_rew.sum(0)                      # [N]
@@ -181,8 +241,8 @@ def entrainer(cfg: Config):
             retours = avantages + b_val
 
         # ---------- 3. Mise à jour PPO ----------
-        f_obs = b_obs.reshape(T * N, obs_size)
-        f_act = b_act.reshape(T * N, act_size)
+        f_obs = b_obs.reshape(T * N, obs_dim)
+        f_act = b_act.reshape(T * N, act_dim)
         f_logp, f_adv = b_logp.reshape(-1), avantages.reshape(-1)
         f_ret, f_val = retours.reshape(-1), b_val.reshape(-1)
 
@@ -241,10 +301,8 @@ def entrainer(cfg: Config):
     if eval_score > meilleur_eval:
         meilleur_eval = eval_score
         chemin_meilleur = f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_best.pt"
-        torch.save(champ.to_save_dict({k: v.detach().clone()
-                                       for k, v in agent.acteur.state_dict().items()}), chemin_meilleur)
-    torch.save(champ.to_save_dict({k: v.detach().clone() for k, v in agent.acteur.state_dict().items()}),
-               f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_final.pt")
+        torch.save(agent.checkpoint(champ), chemin_meilleur)
+    torch.save(agent.checkpoint(champ), f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_final.pt")
 
     logger.close()
     print(f"\n🏆 Meilleur score d'évaluation : {meilleur_eval:.2f}")

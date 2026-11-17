@@ -20,8 +20,8 @@ import argparse
 import torch
 
 from baselines.env import SwimEnv
-from brain import Brain
 from champion import charger_champion
+from politiques import politique_depuis_checkpoint
 
 
 def moy(valeurs):
@@ -33,8 +33,7 @@ def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed, v_max=float(
     torch.manual_seed(seed)
     dev = torch.device("cpu")
     c = charger_champion(chemin, dev)
-    cerveau = Brain(c.obs_size, c.action_size)
-    cerveau.load_state_dict(c.brain_weights)
+    politique = politique_depuis_checkpoint(torch.load(chemin, map_location=dev), c, dev)
     m = c.masque_muscles_actifs.bool()
     env = SwimEnv(c.dico, n, frames, sub_step, coef_e, 0.0, dev)
     obs = env.reset()
@@ -47,7 +46,7 @@ def diagnostiquer(chemin, n, frames, bruit, coef_e, sub_step, seed, v_max=float(
     prog_tot, ener_tot = 0.0, 0.0
     a_prec, done = None, False
     while not done:
-        a = cerveau(obs)
+        a = politique(obs, env.frame_globale)
         a = (a + torch.randn_like(a) * bruit).clamp(-1, 1)
         am = a[:, m]
         amp.append(am.abs().mean().item())

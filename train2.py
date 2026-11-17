@@ -238,7 +238,7 @@ def main():
                 # E20 : la sélection ne se fait plus sur la tranche d'entraînement (qui repart
                 # d'états variés) mais sur frames_selection frames depuis le repos, comme PPO.
                 if episode % cfg.ppo_eval_tous_les == 0 or episode == NB_EPISODES - 1:
-                    eval_score, eval_depl = evaluer_politique(cerveau, dico, cfg.ppo_eval_n_envs,
+                    eval_score, eval_depl = evaluer_politique(lambda o, f: cerveau(o), dico, cfg.ppo_eval_n_envs,
                                                               cfg.frames_selection, cfg, device)
                     if eval_score > meilleur_score_global:
                         meilleur_score_global = eval_score

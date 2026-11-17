@@ -92,6 +92,9 @@ class Config:
     physique_compilee: bool = False    # MegaCreaFast + torch.compile (×3–4 sur GPU, même physique)
     episodes_enchaines: bool = False   # E20 : chaque épisode repart de l'état final du précédent (train2 et PPO)
     frames_selection: int = 300        # horizon (frames, depuis le repos) de l'évaluation qui choisit le meilleur checkpoint
+    symetrie: bool = False             # E22 : même commande pour les muscles miroirs (PPO)
+    politique_rythmique: bool = False  # E22 : commande = MLP(sin φ, cos φ), φ = 2π·frame/periode_rythme (PPO)
+    periode_rythme: int = 40           # E22 : période de l'horloge de nage, en frames
     proba_retour_repos: float = 0.0    # E20b : en épisodes enchaînés, proba qu'un rollout reparte du repos à chaque tranche
 
     # ---------- baselines/ppo.py (baseline PPO, même morphologie figée) ----------
@@ -193,6 +196,9 @@ _AIDE = {
     "physique_compilee": "Physique MegaCreaFast compilée par torch.compile (GPU ; même physique, ×3–4)",
     "episodes_enchaines": "E20 : chaque épisode repart de l'état final du précédent au lieu du repos "
                           "(train2 : exige --maj-par-fenetre)",
+    "symetrie": "E22 : les muscles images par la symétrie miroir du corps reçoivent la même commande",
+    "politique_rythmique": "E22 : la commande ne dépend que de la phase d'une horloge de nage (fluide par construction)",
+    "periode_rythme": "E22 : période de l'horloge de la politique rythmique, en frames",
     "proba_retour_repos": "E20b : en épisodes enchaînés, probabilité qu'un rollout reparte du repos "
                           "à chaque nouvel épisode (apprend à démarrer ; 0 = jamais)",
     "frames_selection": "Horizon (frames depuis le repos) de l'évaluation qui choisit le meilleur checkpoint "
@@ -254,6 +260,7 @@ _CHAMPS_PAR_SCRIPT = {
         "ppo_max_grad_norm", "ppo_std_init", "ppo_eval_tous_les", "ppo_eval_n_envs",
         "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "bruit_test", "proba_retour_repos",
+        "symetrie", "politique_rythmique", "periode_rythme",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",

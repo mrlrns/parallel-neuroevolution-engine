@@ -21,17 +21,15 @@ import argparse
 import torch
 
 from baselines.env import SwimEnv
-from brain import Brain
 from champion import charger_champion
 from config import Config
+from politiques import politique_depuis_checkpoint
 
 
 @torch.no_grad()
 def deplacements(chemin, frames, points, n, seed, cfg):
     ch = charger_champion(chemin, torch.device("cpu"))
-    cerveau = Brain(ch.obs_size, ch.action_size)
-    cerveau.load_state_dict(ch.brain_weights)
-    cerveau.eval()
+    politique = politique_depuis_checkpoint(torch.load(chemin, map_location="cpu"), ch, torch.device("cpu"))
     torch.manual_seed(seed)
     env = SwimEnv(ch.dico, n, frames, cfg.sub_step, cfg.coef_energie, cfg.coef_hauteur,
                   torch.device("cpu"), v_max=cfg.v_max, water_drag=cfg.water_drag)
@@ -39,7 +37,7 @@ def deplacements(chemin, frames, points, n, seed, cfg):
     res = {}
     done = False
     while not done:
-        a = cerveau(obs)
+        a = politique(obs, env.frame_globale)
         obs, _, done = env.step(a + torch.randn_like(a) * cfg.bruit_test)
         if env.frame in points:
             res[env.frame] = env.deplacement().mean().item()
