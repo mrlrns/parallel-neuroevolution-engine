@@ -21,3 +21,6 @@ videos_ia*/
 .vm_venv/
 !results/E18/B/runs/
 !results/E18b/runs/
+!results/E19_rameur/runs/
+# GIF candidats (lourds), seul le GIF retenu va dans docs/
+docs/gif_candidats/
