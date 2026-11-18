@@ -76,13 +76,16 @@ def _pas_compile():
 def classe_physique(compilee, version="v1", **options_v2):
     """MegaCrea (référence), MegaCreaFast compilée ou MegaCreaXPBD (v2), même signature.
 
-    options_v2 : iterations, os_rigides, facteur_raideur (physique_v2.MegaCreaXPBD)."""
+    options_v2 : iterations, os_rigides, facteur_raideur, ancrages, morphologie_stricte
+    (physique_v2.MegaCreaXPBD)."""
     if version == "v2":
         from physique_v2 import MegaCreaXPBD
         return lambda dico, batch_size, device="cuda": MegaCreaXPBD(dico, batch_size, device=device,
                                                                      compile=compilee, **options_v2)
     if version != "v1":
         raise ValueError(f"physique inconnue : {version!r} (v1 ou v2)")
+    if options_v2.get("ancrages"):
+        raise ValueError("les points d'ancrage demandent la physique v2 (--physique v2)")
     if not compilee:
         return MegaCrea
     return lambda dico, batch_size, device="cuda": MegaCreaFast(dico, batch_size, device=device, compile=True)

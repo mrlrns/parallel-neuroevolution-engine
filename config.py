@@ -94,6 +94,8 @@ class Config:
     xpbd_iterations: int = 1           # v2 : passes de correction des contraintes par sous-pas
     os_rigides: bool = False           # v2 : os de souplesse nulle (longueur exactement imposée)
     facteur_raideur: float = 1.0       # v2 : multiplie la raideur des liens (muscles plus forts)
+    ancrages: bool = False             # v2 : nœuds ancrés le long d'un os (sinon os scindés en charnières)
+    morphologie_stricte: bool = False  # v2 : refuser une morphologie invalide (sinon simple avertissement)
     episodes_enchaines: bool = False   # E20 : chaque épisode repart de l'état final du précédent (train2 et PPO)
     frames_selection: int = 300        # horizon (frames, depuis le repos) de l'évaluation qui choisit le meilleur checkpoint
     symetrie: bool = False             # E22 : même commande pour les muscles miroirs (PPO)
@@ -202,6 +204,8 @@ _AIDE = {
     "xpbd_iterations": "Physique v2 : passes de correction des contraintes par sous-pas",
     "os_rigides": "Physique v2 : os parfaitement rigides (souplesse nulle)",
     "facteur_raideur": "Physique v2 : multiplicateur de la raideur des liens",
+    "ancrages": "Physique v2 : nœuds ancrés le long d'un os (sinon l'os est scindé en charnière libre)",
+    "morphologie_stricte": "Physique v2 : refuser une créature qui viole les règles 1 et 2' (morphologie.py)",
     "episodes_enchaines": "E20 : chaque épisode repart de l'état final du précédent au lieu du repos "
                           "(train2 : exige --maj-par-fenetre)",
     "symetrie": "E22 : les muscles images par la symétrie miroir du corps reçoivent la même commande",
@@ -258,7 +262,7 @@ _CHAMPS_PAR_SCRIPT = {
         "poids_aleatoires", "fenetre_bptt", "maj_par_fenetre",
         "detachement_complet", "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "ppo_eval_tous_les", "ppo_eval_n_envs", "bruit_test",
-        "proba_retour_repos", "physique", "xpbd_iterations", "os_rigides", "facteur_raideur",
+        "proba_retour_repos", "physique", "xpbd_iterations", "os_rigides", "facteur_raideur", "ancrages", "morphologie_stricte",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
@@ -269,7 +273,7 @@ _CHAMPS_PAR_SCRIPT = {
         "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "bruit_test", "proba_retour_repos",
         "symetrie", "politique_rythmique", "periode_rythme",
-        "physique", "xpbd_iterations", "os_rigides", "facteur_raideur",
+        "physique", "xpbd_iterations", "os_rigides", "facteur_raideur", "ancrages", "morphologie_stricte",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",

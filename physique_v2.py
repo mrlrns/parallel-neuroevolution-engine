@@ -31,66 +31,81 @@ Un sous-pas de durée Δt :
 Conservation : chaque correction déplace a et b de w_a·Δλ·n et −w_b·Δλ·n ; pondérées
 par les masses, elles s'annulent (m_a·w_a = m_b·w_b = 1). Sans eau, la quantité de
 mouvement totale est conservée (testé).
+
+Points d'ancrage (option `ancrages`, défaut désactivé ; voir morphologie.py) : un nœud ancré M
+est le point x_M = Σ_j T[j, M]·x_j = (1−s)·x_a + s·x_b de l'os a→b, sans masse ni vitesse
+propres. Toutes les matrices d'incidence sont composées par T une fois pour toutes
+(D ← T·D) : un lien qui touche M agit sur a et b avec les poids (1−s) et s. Le dénominateur
+de Δλ devient ∇C·M⁻¹·∇Cᵀ = Σ_j w_j·D[j, m]² (pour un lien sans ancrage, w_a + w_b). Les
+colonnes de T somment à 1 et celles de D à 0, donc celles de T·D aussi : la conservation de
+la quantité de mouvement tient toujours. Après chaque sous-pas, x_M est recalculé par T.
+Sans ancrage, T = identité n'est pas appliquée : calcul identique à l'étape 1b.
 """
+
+import warnings
 
 import torch
 
 from megaVecto import MegaCrea
+from morphologie import valider_morphologie
 
 FACTEUR_TANGENTIEL = 0.3
 
 
-def colorier_liens(muscle1, muscle2, masque_muscles):
+def colorier_liens(muscle1, muscle2, masque_muscles, ancrages=None):
     """Couleur de chaque lien [P, M] (−1 pour un lien fantôme) : deux liens d'une même
-    couleur n'ont aucun nœud commun. Coloration gloutonne, une fois par créature."""
+    couleur n'ont aucun nœud commun. Coloration gloutonne, une fois par créature.
+    Avec des ancrages, un nœud ancré compte comme les deux extrémités de son os."""
     P, M = muscle1.shape
     couleurs = torch.full((P, M), -1, dtype=torch.long)
     m1, m2, mk = muscle1.cpu().tolist(), muscle2.cpu().tolist(), masque_muscles.cpu().tolist()
     for p in range(P):
+        support = {n: {m1[p][o], m2[p][o]} for n, o, _ in (ancrages[p] if ancrages else ())}
         noeuds_par_couleur = []
         for m in range(M):
             if mk[p][m] == 0:
                 continue
-            a, b = m1[p][m], m2[p][m]
+            noeuds = support.get(m1[p][m], {m1[p][m]}) | support.get(m2[p][m], {m2[p][m]})
             c = 0
-            while c < len(noeuds_par_couleur) and (a in noeuds_par_couleur[c] or b in noeuds_par_couleur[c]):
+            while c < len(noeuds_par_couleur) and noeuds & noeuds_par_couleur[c]:
                 c += 1
             if c == len(noeuds_par_couleur):
                 noeuds_par_couleur.append(set())
-            noeuds_par_couleur[c].update((a, b))
+            noeuds_par_couleur[c].update(noeuds)
             couleurs[p, m] = c
     return couleurs.to(muscle1.device)
 
 
-def pas_xpbd(X, Y, vX, vY, D, D1, D2, couleurs, target, alpha, c, kN, kT, w, mask_N, dt, v_max,
-             iterations: int, amort_integre: bool = True):
+def pas_xpbd(X, Y, vX, vY, D, A, wsum, couleurs, target, alpha, c, kN, kT, w, mask_N, dt, v_max,
+             iterations: int, amort_integre: bool = True, T=None):
     """Un sous-pas XPBD. Fonction pure (compilable par torch.compile).
 
-    Matrices d'incidence [P, N, M] : D = +1 en m2, −1 en m1 (différences) ; D1, D2 = indicatrices
-    de m1 et m2. Pour une grandeur de lien g [P, B, M], la somme sur les nœuds est D @ g :
-    m2 reçoit +g, m1 reçoit −g, sans gather ni scatter. couleurs : [C, P, B, M] (0/1)."""
+    Matrices d'incidence [P, N, M] : D = +1 en m2, −1 en m1 (différences) ; A = D1 + D2
+    (indicatrices des extrémités). Pour une grandeur de lien g [P, B, M], la somme sur les
+    nœuds est D @ g : m2 reçoit +g, m1 reçoit −g, sans gather ni scatter. Avec des ancrages,
+    D et A sont déjà composées par T [P, N, N] (x_virtuel = X @ T). wsum [P, B, M] :
+    Σ_j w_j·D[j, m]². couleurs : [C, P, B, M] (0/1)."""
     def diff(Z):                                        # z_m2 − z_m1, [P, B, M]
         return torch.einsum("pbn,pnm->pbm", Z, D)
 
     def vers_noeuds(g):                                 # Σ_m D[n, m]·g[m], [P, B, N]
         return torch.einsum("pbm,pnm->pbn", g, D)
 
-    w1 = torch.einsum("pbn,pnm->pbm", w, D1)
-    w2 = torch.einsum("pbn,pnm->pbm", w, D2)
-    wsum = w1 + w2
+    def projeter(Z):                                    # recalcule les nœuds ancrés
+        return Z if T is None else torch.einsum("pbj,pjk->pbk", Z, T)
 
     # 1. traînée (modèle v1, explicite) — chaque extrémité reçoit la moitié
     dx, dy = diff(X), diff(Y)
     d = torch.sqrt(dx * dx + dy * dy + 1e-3)
     ux, uy = dx / d, dy / d
-    vmx = 0.5 * torch.einsum("pbn,pnm->pbm", vX, D1 + D2)
-    vmy = 0.5 * torch.einsum("pbn,pnm->pbm", vY, D1 + D2)
+    vmx = 0.5 * torch.einsum("pbn,pnm->pbm", vX, A)
+    vmy = 0.5 * torch.einsum("pbn,pnm->pbm", vY, A)
     gN = -d * (vmx * -uy + vmy * ux) * kN
     gT = -d * (vmx * ux + vmy * uy) * kT
     fx = gN * -uy + gT * ux
     fy = gN * ux + gT * uy
-    vX = vX + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fx, D1 + D2)
-    vY = vY + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fy, D1 + D2)
+    vX = vX + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fx, A)
+    vY = vY + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fy, A)
 
     # 2. prédiction par inertie
     X0, Y0 = X, Y
@@ -117,6 +132,7 @@ def pas_xpbd(X, Y, vX, vY, D, D1, D2, couleurs, target, alpha, c, kN, kT, w, mas
             Y = Y + w * cy
 
     # 4. vitesses
+    X, Y = projeter(X), projeter(Y)
     vX = (X - X0) / dt
     vY = (Y - Y0) / dt
 
@@ -131,6 +147,8 @@ def pas_xpbd(X, Y, vX, vY, D, D1, D2, couleurs, target, alpha, c, kN, kT, w, mas
         cx, cy = vers_noeuds(p * nx), vers_noeuds(p * ny)
         vX = vX + w * cx
         vY = vY + w * cy
+    if not amort_integre:
+        vX, vY = projeter(vX), projeter(vY)
 
     vX = torch.clamp(vX, -v_max, v_max) * mask_N
     vY = torch.clamp(vY, -v_max, v_max) * mask_N
@@ -149,8 +167,15 @@ def _pas_xpbd_compile():
 
 class MegaCreaXPBD(MegaCrea):
     def __init__(self, dico_mega_tenseurs, batch_size, device="cuda", iterations=1,
-                 os_rigides=False, facteur_raideur=1.0, compile=False, amort_integre=True):
+                 os_rigides=False, facteur_raideur=1.0, compile=False, amort_integre=True,
+                 ancrages=False, morphologie_stricte=False):
+        liste_ancrages = dico_mega_tenseurs.get("ancrages")
+        if any(liste_ancrages or ()) and not ancrages:
+            raise ValueError("créature avec points d'ancrage : activer l'option ancrages "
+                             "(ou charger le champion sans, cf. morphologie.scinder_ancrages)")
+        self._ancrages = liste_ancrages if ancrages and any(liste_ancrages or ()) else None
         super().__init__(dico_mega_tenseurs, batch_size, device=device)
+        self._verifier_morphologie(morphologie_stricte)
         self.iterations = iterations
         self.amort_integre = amort_integre
         B = batch_size
@@ -169,13 +194,55 @@ class MegaCreaXPBD(MegaCrea):
         self._D1 = torch.zeros(P, N, M, dtype=dt_, device=dev).scatter_(1, self.muscle1.unsqueeze(1), 1.0) * mk
         self._D2 = torch.zeros(P, N, M, dtype=dt_, device=dev).scatter_(1, self.muscle2.unsqueeze(1), 1.0) * mk
         self._D = self._D2 - self._D1
+        self._A = self._D1 + self._D2
         self._w = (self.mask_N_exp / self.masses).contiguous()                     # 0 pour un nœud fantôme
-        col = colorier_liens(self.muscle1, self.muscle2, self.masque_muscles)
+        self._T = None
+        if self._ancrages is not None:
+            T = torch.eye(N, dtype=dt_, device=dev).repeat(P, 1, 1)                 # [P, N, N]
+            m1l, m2l = self.muscle1.tolist(), self.muscle2.tolist()
+            for p, liste in enumerate(self._ancrages):
+                for n, o, s in liste:
+                    T[p, n, n] = 0.0
+                    T[p, m1l[p][o], n] = 1.0 - s
+                    T[p, m2l[p][o], n] = s
+                    self._w[p, :, n] = 0.0                                          # pas de masse propre
+            self._T = T
+            self._D = torch.einsum("pjk,pkm->pjm", T, self._D)
+            self._A = torch.einsum("pjk,pkm->pjm", T, self._A)
+            self._recalculer_repos()
+        self._wsum = torch.einsum("pbn,pnm->pbm", self._w, self._D * self._D).contiguous()
+        col = colorier_liens(self.muscle1, self.muscle2, self.masque_muscles, self._ancrages)
         self._couleurs = torch.stack([(col == c).to(dt_).unsqueeze(1).expand(-1, B, -1)
                                       for c in range(int(col.max().item()) + 1)]).contiguous()
         self._facteur_trainee = ((os_ + (1 - os_) * 0.3) * self.mask_M_exp).contiguous()
         self._pas = _pas_xpbd_compile() if compile else pas_xpbd
         self.force_liens = torch.zeros_like(k)                                      # λ/Δt² du dernier sous-pas
+
+    def _verifier_morphologie(self, stricte):
+        m1l, m2l = self.muscle1.tolist(), self.muscle2.tolist()
+        os_l, mk = self.is_bone.tolist(), self.masque_muscles.tolist()
+        nn = self.masque_noeuds.sum(dim=1).long().tolist()
+        for p in range(len(m1l)):
+            nm = int(sum(mk[p]))
+            erreurs = valider_morphologie(m1l[p][:nm], m2l[p][:nm], os_l[p][:nm], nn[p],
+                                          self._ancrages[p] if self._ancrages else ())
+            if erreurs:
+                msg = f"morphologie invalide (créature {p}) : " + " ; ".join(erreurs)
+                if stricte:
+                    raise ValueError(msg)
+                warnings.warn(msg, stacklevel=3)
+
+    def _recalculer_repos(self):
+        """Ancrages : place les nœuds ancrés sur leur os (le bruit initial les en écarte), puis
+        recalcule les longueurs au repos et le barycentre comme MegaCrea.__init__."""
+        self.X = torch.einsum("pbj,pjk->pbk", self.X, self._T)
+        self.Y = torch.einsum("pbj,pjk->pbk", self.Y, self._T)
+        x1, y1, x2, y2 = self._paires(self.X, self.Y)
+        self.base_length = torch.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2 + 1e-8) * self.mask_M_exp
+        self.target_length = self.base_length.clone()
+        nb = torch.clamp(torch.sum(self.mask_N_exp, dim=2), min=1.0)
+        self.previous_distance = torch.sum(self.X * self.mask_N_exp, dim=2) / nb
+        self.previous_height = torch.sum(self.Y * self.mask_N_exp, dim=2) / nb
 
     def _paires(self, X, Y):
         """Positions des extrémités m1, m2 de chaque lien (pour les tests et les outils)."""
@@ -188,6 +255,6 @@ class MegaCreaXPBD(MegaCrea):
     def apply_physics(self, dt):
         kN = self.water_drag * self._facteur_trainee
         self.X, self.Y, self.vX, self.vY, self.force_liens = self._pas(
-            self.X, self.Y, self.vX, self.vY, self._D, self._D1, self._D2, self._couleurs,
+            self.X, self.Y, self.vX, self.vY, self._D, self._A, self._wsum, self._couleurs,
             self.target_length, self._alpha, self._c, kN, kN * FACTEUR_TANGENTIEL, self._w,
-            self.mask_N_exp, float(dt), self.v_max, self.iterations, self.amort_integre)
+            self.mask_N_exp, float(dt), self.v_max, self.iterations, self.amort_integre, self._T)

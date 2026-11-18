@@ -31,6 +31,7 @@ class Champion:
     max_muscles: int
     brain_weights: Optional[dict]
     dico: dict
+    ancrages: Optional[list] = None
 
     @property
     def num_nodes(self) -> int:
@@ -64,11 +65,18 @@ class Champion:
             'target_length': self.target_length,
             'brain_weights': brain_weights,
             'max_noeuds': self.max_noeuds, 'max_muscles': self.max_muscles,
+            **({'ancrages': self.ancrages} if self.ancrages else {}),
         }
 
 
-def charger_champion(chemin, device) -> Champion:
+def charger_champion(chemin, device, ancrages=False) -> Champion:
+    """ancrages : garder les points d'ancrage (physique v2, option ancrages). Sinon, un
+    champion qui en porte est chargé avec ses os scindés (morphologie.scinder_ancrages)."""
     donnees = torch.load(chemin, map_location=device)
+    if donnees.get('ancrages') and not ancrages:
+        from morphologie import scinder_ancrages
+        print(f"{chemin} : points d'ancrage scindés en articulations libres (option ancrages désactivée)")
+        donnees = scinder_ancrages(donnees)
 
     x = donnees['x']
     y = donnees['y']
@@ -92,9 +100,12 @@ def charger_champion(chemin, device) -> Champion:
         "masque_noeuds": (torch.arange(max_noeuds, device=device) < n_noeuds).float().unsqueeze(0),
         "masque_muscles": (torch.arange(max_muscles, device=device) < n_muscles).float().unsqueeze(0),
     }
+    liste_ancrages = [list(a) for a in donnees.get('ancrages') or []] if ancrages else []
+    if liste_ancrages:
+        dico["ancrages"] = [[(int(n), int(o), float(s)) for n, o, s in liste_ancrages]]
 
     return Champion(
         x=x, y=y, is_bone=is_bone, muscle1=muscle1, muscle2=muscle2,
         target_length=target_length, max_noeuds=max_noeuds, max_muscles=max_muscles,
-        brain_weights=donnees.get('brain_weights'), dico=dico,
+        brain_weights=donnees.get('brain_weights'), dico=dico, ancrages=liste_ancrages or None,
     )

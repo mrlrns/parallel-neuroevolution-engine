@@ -78,7 +78,7 @@ def main():
     # ==========================================
     # 📂 CHARGEMENT DU CHAMPION
     # ==========================================
-    champ = charger_champion(cfg.chemin_champion, device)
+    champ = charger_champion(cfg.chemin_champion, device, ancrages=cfg.ancrages)
     dico = champ.dico
     print(f"✅ Champion chargé depuis {cfg.chemin_champion}")
     print(f"   Topologie : {champ.num_nodes} noeuds, {champ.num_muscles} liens "
@@ -116,7 +116,8 @@ def main():
             "episodes_enchaines": ENCHAINES, "frames_selection": cfg.frames_selection,
             "proba_retour_repos": cfg.proba_retour_repos, "physique": cfg.physique,
             "xpbd_iterations": cfg.xpbd_iterations, "os_rigides": cfg.os_rigides,
-            "facteur_raideur": cfg.facteur_raideur,
+            "facteur_raideur": cfg.facteur_raideur, "ancrages": cfg.ancrages,
+            "morphologie_stricte": cfg.morphologie_stricte,
         },
     )
 

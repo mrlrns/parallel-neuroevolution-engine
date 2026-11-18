@@ -104,7 +104,8 @@ def retours_au_repos(mega, proba, fabrique):
 def options_v2(cfg):
     """Options de la physique v2 lues dans la config (ignorées en v1)."""
     return {"iterations": cfg.xpbd_iterations, "os_rigides": cfg.os_rigides,
-            "facteur_raideur": cfg.facteur_raideur}
+            "facteur_raideur": cfg.facteur_raideur, "ancrages": cfg.ancrages,
+            "morphologie_stricte": cfg.morphologie_stricte}
 
 
 @torch.no_grad()

@@ -60,6 +60,8 @@ physique: v1                  # v1 : ressorts explicites ; v2 : contraintes XPBD
 xpbd_iterations: 1            # v2 : passes de correction par sous-pas
 os_rigides: false             # v2 : os parfaitement rigides
 facteur_raideur: 1.0          # v2 : multiplicateur de la raideur des liens
+ancrages: false               # v2 : nœuds ancrés le long d'un os (sinon os scindés en charnières)
+morphologie_stricte: false    # v2 : refuser une morphologie invalide (sinon avertissement)
 episodes_enchaines: false     # E20 : chaque épisode repart de l'état final du précédent (train2 : avec maj_par_fenetre)
 frames_selection: 300         # horizon de l'évaluation qui choisit le meilleur checkpoint (900 en E20)
 proba_retour_repos: 0.0       # E20b : proba qu'un rollout reparte du repos à chaque épisode enchaîné (0.1 en E20b)

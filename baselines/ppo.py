@@ -143,7 +143,7 @@ def entrainer(cfg: Config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device utilisé : {device}")
 
-    champ = charger_champion(cfg.chemin_champion, device)
+    champ = charger_champion(cfg.chemin_champion, device, ancrages=cfg.ancrages)
     env = SwimEnv(champ.dico, cfg.ppo_n_envs, cfg.train2_frame_nb, cfg.sub_step,
                   cfg.coef_energie, cfg.coef_hauteur, device,
                   physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
@@ -187,7 +187,8 @@ def entrainer(cfg: Config):
                                              "episodes_enchaines", "frames_selection",
                                              "proba_retour_repos", "symetrie", "politique_rythmique",
                                              "periode_rythme", "physique", "xpbd_iterations",
-                                             "os_rigides", "facteur_raideur")}},
+                                             "os_rigides", "facteur_raideur", "ancrages",
+                                             "morphologie_stricte")}},
     )
 
     # Tampons du rollout : [T, N, ...]

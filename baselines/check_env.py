@@ -91,7 +91,7 @@ def main():
         parser.error("--chemin-champion est requis (ou renseigne 'chemin_champion' dans le YAML)")
 
     device = torch.device("cpu")   # déterminisme requis, voir la docstring
-    champ = charger_champion(cfg.chemin_champion, device)
+    champ = charger_champion(cfg.chemin_champion, device, ancrages=cfg.ancrages)
     cerveau = Brain(champ.obs_size, champ.action_size).to(device)
     cerveau.load_state_dict(champ.brain_weights)
     cerveau.eval()
