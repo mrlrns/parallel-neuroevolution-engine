@@ -76,11 +76,11 @@ def _pas_compile():
 def classe_physique(compilee, version="v1", **options_v2):
     """MegaCrea (référence), MegaCreaFast compilée ou MegaCreaXPBD (v2), même signature.
 
-    options_v2 : iterations, os_rigides, facteur_raideur (physique_v2.MegaCreaXPBD).
-    La v2 n'est pas encore compilée : `compilee` est ignoré pour elle."""
+    options_v2 : iterations, os_rigides, facteur_raideur (physique_v2.MegaCreaXPBD)."""
     if version == "v2":
         from physique_v2 import MegaCreaXPBD
-        return lambda dico, batch_size, device="cuda": MegaCreaXPBD(dico, batch_size, device=device, **options_v2)
+        return lambda dico, batch_size, device="cuda": MegaCreaXPBD(dico, batch_size, device=device,
+                                                                     compile=compilee, **options_v2)
     if version != "v1":
         raise ValueError(f"physique inconnue : {version!r} (v1 ou v2)")
     if not compilee:

@@ -130,3 +130,18 @@ def test_swimenv_and_ppo_run_with_physics_v2(tmp_path):
          "--dossier-runs", str(tmp_path), "--dossier-baselines", str(tmp_path)],
         cwd=RACINE, capture_output=True, text=True, timeout=300)
     assert res.returncode == 0, res.stderr[-2000:]
+
+
+def test_compiled_v2_matches_eager():
+    c = _champ(RAMEUR)
+    etats = []
+    for compile_ in (False, True):
+        torch.manual_seed(3)
+        m = MegaCreaXPBD(c.dico, 3, device="cpu", compile=compile_)
+        for f in range(10):
+            if f % 5 == 0:
+                m.apply_action(torch.full((1, 3, c.action_size), 0.5), f)
+            for _ in range(10):
+                m.apply_physics(torch.tensor(0.1))
+        etats.append(m.X.clone())
+    assert torch.allclose(etats[0], etats[1], atol=1e-4)

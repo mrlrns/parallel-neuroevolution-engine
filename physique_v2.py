@@ -14,14 +14,19 @@ simulation, et un os peut être parfaitement rigide (α = 0).
 Un sous-pas de durée Δt :
   1. traînée de l'eau (même modèle que la v1, explicite) :   v ← v + Δt·F_eau/m
   2. prédiction par inertie :                                 x̃ = x + Δt·v
-  3. contraintes (Gauss-Seidel par couleurs, `iterations` passes, λ repart de 0) :
+  3. contraintes (`iterations` passes, λ repart de 0 à chaque sous-pas) :
        Δλ = (−C − α̃·λ) / (w_a + w_b + α̃),   α̃ = α/Δt²,   w = 1/m
        x_a += w_a·Δλ·∇_a C,   x_b += w_b·Δλ·∇_b C,   λ += Δλ
-     Les liens sont coloriés (une couleur = des liens sans nœud commun) : tous les liens
-     d'une couleur sont corrigés en parallèle sans conflit, couleur après couleur.
+     Gauss-Seidel par couleurs : les liens sont coloriés (une couleur = des liens sans nœud
+     commun) et corrigés couleur après couleur, sans conflit. (Jacobi — tous les liens en une
+     passe, moyennés par nœud — a été essayé et écarté : avec 1 ou 2 passes il rend les
+     liens bien trop mous et change la physique.)
   4. vitesses : v = (x_nouveau − x_début)/Δt
-  5. amortissement le long de chaque lien, implicite (donc stable pour tout c) :
-       v_rel' = v_rel / (1 + Δt·c·(w_a + w_b)),   c = 2√k comme en v1.
+  Amortissement (c = 2√k comme en v1), intégré à la correction (Macklin et al. 2016, éq. 26) :
+       Δλ = (−C − α̃·λ − γ·∇C·(x − x_début)) / ((1 + γ)(w_a + w_b) + α̃),   γ = α·c/Δt
+     Une seule boucle sur les couleurs par sous-pas. Option `amort_integre=False` : ancien
+     amortissement implicite séparé, v_rel' = v_rel / (1 + Δt·c·(w_a + w_b)), plus lent et
+     plus dissipatif à grand pas.
 
 Conservation : chaque correction déplace a et b de w_a·Δλ·n et −w_b·Δλ·n ; pondérées
 par les masses, elles s'annulent (m_a·w_a = m_b·w_b = 1). Sans eau, la quantité de
@@ -31,6 +36,8 @@ mouvement totale est conservée (testé).
 import torch
 
 from megaVecto import MegaCrea
+
+FACTEUR_TANGENTIEL = 0.3
 
 
 def colorier_liens(muscle1, muscle2, masque_muscles):
@@ -55,99 +62,132 @@ def colorier_liens(muscle1, muscle2, masque_muscles):
     return couleurs.to(muscle1.device)
 
 
+def pas_xpbd(X, Y, vX, vY, D, D1, D2, couleurs, target, alpha, c, kN, kT, w, mask_N, dt, v_max,
+             iterations: int, amort_integre: bool = True):
+    """Un sous-pas XPBD. Fonction pure (compilable par torch.compile).
+
+    Matrices d'incidence [P, N, M] : D = +1 en m2, −1 en m1 (différences) ; D1, D2 = indicatrices
+    de m1 et m2. Pour une grandeur de lien g [P, B, M], la somme sur les nœuds est D @ g :
+    m2 reçoit +g, m1 reçoit −g, sans gather ni scatter. couleurs : [C, P, B, M] (0/1)."""
+    def diff(Z):                                        # z_m2 − z_m1, [P, B, M]
+        return torch.einsum("pbn,pnm->pbm", Z, D)
+
+    def vers_noeuds(g):                                 # Σ_m D[n, m]·g[m], [P, B, N]
+        return torch.einsum("pbm,pnm->pbn", g, D)
+
+    w1 = torch.einsum("pbn,pnm->pbm", w, D1)
+    w2 = torch.einsum("pbn,pnm->pbm", w, D2)
+    wsum = w1 + w2
+
+    # 1. traînée (modèle v1, explicite) — chaque extrémité reçoit la moitié
+    dx, dy = diff(X), diff(Y)
+    d = torch.sqrt(dx * dx + dy * dy + 1e-3)
+    ux, uy = dx / d, dy / d
+    vmx = 0.5 * torch.einsum("pbn,pnm->pbm", vX, D1 + D2)
+    vmy = 0.5 * torch.einsum("pbn,pnm->pbm", vY, D1 + D2)
+    gN = -d * (vmx * -uy + vmy * ux) * kN
+    gT = -d * (vmx * ux + vmy * uy) * kT
+    fx = gN * -uy + gT * ux
+    fy = gN * ux + gT * uy
+    vX = vX + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fx, D1 + D2)
+    vY = vY + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fy, D1 + D2)
+
+    # 2. prédiction par inertie
+    X0, Y0 = X, Y
+    X = X + dt * vX
+    Y = Y + dt * vY
+
+    # 3. contraintes
+    alpha_t = alpha / (dt * dt)
+    # amortissement intégré à la contrainte (Macklin et al. 2016, éq. 26) : γ = α·c/Δt
+    gamma = alpha * c / dt if amort_integre else torch.zeros_like(alpha)
+    dX0, dY0 = diff(X0), diff(Y0)
+    lam = torch.zeros_like(target)
+    for _ in range(iterations):
+        for k in range(couleurs.shape[0]):
+            mc = couleurs[k]
+            dx, dy = diff(X), diff(Y)
+            d = torch.sqrt(dx * dx + dy * dy + 1e-8)
+            nx, ny = dx / d, dy / d
+            vit = nx * (dx - dX0) + ny * (dy - dY0)          # ∇C·(x − x_début)
+            dlam = (target - d - alpha_t * lam - gamma * vit) / ((1 + gamma) * wsum + alpha_t + 1e-12) * mc
+            lam = lam + dlam
+            cx, cy = vers_noeuds(dlam * nx), vers_noeuds(dlam * ny)     # m2 : +, m1 : −
+            X = X + w * cx
+            Y = Y + w * cy
+
+    # 4. vitesses
+    vX = (X - X0) / dt
+    vY = (Y - Y0) / dt
+
+    # 5. amortissement implicite le long des liens (sauf s'il est déjà intégré à l'étape 3)
+    dx, dy = diff(X), diff(Y)
+    d = torch.sqrt(dx * dx + dy * dy + 1e-8)
+    nx, ny = dx / d, dy / d
+    for k in range(0 if amort_integre else couleurs.shape[0]):
+        mc = couleurs[k]
+        vrel = diff(vX) * nx + diff(vY) * ny
+        p = (vrel / (1 + dt * c * wsum) - vrel) / (wsum + 1e-12) * mc
+        cx, cy = vers_noeuds(p * nx), vers_noeuds(p * ny)
+        vX = vX + w * cx
+        vY = vY + w * cy
+
+    vX = torch.clamp(vX, -v_max, v_max) * mask_N
+    vY = torch.clamp(vY, -v_max, v_max) * mask_N
+    return X, Y, vX, vY, lam / (dt * dt)
+
+
+_PAS_XPBD_COMPILE = None
+
+
+def _pas_xpbd_compile():
+    global _PAS_XPBD_COMPILE
+    if _PAS_XPBD_COMPILE is None:
+        _PAS_XPBD_COMPILE = torch.compile(pas_xpbd)
+    return _PAS_XPBD_COMPILE
+
+
 class MegaCreaXPBD(MegaCrea):
     def __init__(self, dico_mega_tenseurs, batch_size, device="cuda", iterations=1,
-                 os_rigides=False, facteur_raideur=1.0):
+                 os_rigides=False, facteur_raideur=1.0, compile=False, amort_integre=True):
         super().__init__(dico_mega_tenseurs, batch_size, device=device)
         self.iterations = iterations
+        self.amort_integre = amort_integre
         B = batch_size
+        P, _, N = self.X.shape
+        M = self.muscle1.shape[1]
+        dev, dt_ = self.X.device, self.X.dtype
         k = self.stiffness.unsqueeze(1).expand(-1, B, -1) * facteur_raideur        # [P, B, M]
         os_ = self.is_bone_exp
-        # souplesse α = 1/k (0 pour un os rigide) ; liens fantômes : sans effet (masqués)
         alpha = torch.where(k > 0, 1.0 / torch.clamp(k, min=1e-12), torch.zeros_like(k))
         if os_rigides:
             alpha = torch.where(os_ == 1.0, torch.zeros_like(alpha), alpha)
-        self._alpha = alpha
-        self._c = 2.0 * torch.sqrt(k)                                               # amortissement, comme la v1
-        self._m1 = self.muscle1.unsqueeze(1).expand(-1, B, -1)
-        self._m2 = self.muscle2.unsqueeze(1).expand(-1, B, -1)
-        self._w = self.mask_N_exp / self.masses                                     # 0 pour un nœud fantôme
-        couleurs = colorier_liens(self.muscle1, self.muscle2, self.masque_muscles)
-        self._masques_couleur = [(couleurs == c).float().unsqueeze(1).expand(-1, B, -1)
-                                 for c in range(int(couleurs.max().item()) + 1)]
-        self._facteur_trainee = (os_ + (1 - os_) * 0.3) * self.mask_M_exp
+        self._alpha = alpha.contiguous()
+        self._c = (2.0 * torch.sqrt(k)).contiguous()                                # amortissement, comme la v1
+        # matrices d'incidence (liens fantômes : colonnes nulles)
+        mk = self.masque_muscles.to(dt_).unsqueeze(1)                               # [P, 1, M]
+        self._D1 = torch.zeros(P, N, M, dtype=dt_, device=dev).scatter_(1, self.muscle1.unsqueeze(1), 1.0) * mk
+        self._D2 = torch.zeros(P, N, M, dtype=dt_, device=dev).scatter_(1, self.muscle2.unsqueeze(1), 1.0) * mk
+        self._D = self._D2 - self._D1
+        self._w = (self.mask_N_exp / self.masses).contiguous()                     # 0 pour un nœud fantôme
+        col = colorier_liens(self.muscle1, self.muscle2, self.masque_muscles)
+        self._couleurs = torch.stack([(col == c).to(dt_).unsqueeze(1).expand(-1, B, -1)
+                                      for c in range(int(col.max().item()) + 1)]).contiguous()
+        self._facteur_trainee = ((os_ + (1 - os_) * 0.3) * self.mask_M_exp).contiguous()
+        self._pas = _pas_xpbd_compile() if compile else pas_xpbd
         self.force_liens = torch.zeros_like(k)                                      # λ/Δt² du dernier sous-pas
 
-    # ------------------------------------------------------------------ outils
     def _paires(self, X, Y):
-        x1, y1 = X.gather(2, self._m1), Y.gather(2, self._m1)
-        x2, y2 = X.gather(2, self._m2), Y.gather(2, self._m2)
+        """Positions des extrémités m1, m2 de chaque lien (pour les tests et les outils)."""
+        x1 = torch.einsum("pbn,pnm->pbm", X, self._D1)
+        y1 = torch.einsum("pbn,pnm->pbm", Y, self._D1)
+        x2 = torch.einsum("pbn,pnm->pbm", X, self._D2)
+        y2 = torch.einsum("pbn,pnm->pbm", Y, self._D2)
         return x1, y1, x2, y2
 
-    def _repartir(self, val1, val2):
-        """Somme sur les nœuds de val1 (vers m1) et val2 (vers m2) : [P, B, N]."""
-        out = torch.zeros_like(self.X)
-        return out.scatter_add(2, self._m1, val1).scatter_add(2, self._m2, val2)
-
-    # ------------------------------------------------------------------ un sous-pas
     def apply_physics(self, dt):
-        dt = float(dt)
-        X0, Y0 = self.X, self.Y
-        m1w, m2w = self._w.gather(2, self._m1), self._w.gather(2, self._m2)
-
-        # 1. traînée (modèle v1, explicite)
-        x1, y1, x2, y2 = self._paires(X0, Y0)
-        vx1, vy1, vx2, vy2 = self._paires(self.vX, self.vY)
-        dx, dy = x2 - x1, y2 - y1
-        d = torch.sqrt(dx * dx + dy * dy + 1e-3)
-        ux, uy = dx / d, dy / d
-        vmx, vmy = (vx1 + vx2) / 2, (vy1 + vy2) / 2
         kN = self.water_drag * self._facteur_trainee
-        kT = kN * 0.3
-        gN = -d * (vmx * -uy + vmy * ux) * kN
-        gT = -d * (vmx * ux + vmy * uy) * kT
-        fx, fy = gN * -uy + gT * ux, gN * ux + gT * uy
-        FX, FY = self._repartir(fx / 2, fx / 2), self._repartir(fy / 2, fy / 2)
-        vX = self.vX + dt * FX * self._w
-        vY = self.vY + dt * FY * self._w
-
-        # 2. prédiction par inertie
-        X = X0 + dt * vX
-        Y = Y0 + dt * vY
-
-        # 3. contraintes, Gauss-Seidel par couleurs
-        alpha_t = self._alpha / (dt * dt)
-        lam = torch.zeros_like(self.target_length)
-        for _ in range(self.iterations):
-            for mc in self._masques_couleur:
-                x1, y1, x2, y2 = self._paires(X, Y)
-                dx, dy = x2 - x1, y2 - y1
-                d = torch.sqrt(dx * dx + dy * dy + 1e-8)
-                nx, ny = dx / d, dy / d                       # ∇_b C = n, ∇_a C = −n
-                C = d - self.target_length
-                dlam = (-C - alpha_t * lam) / (m1w + m2w + alpha_t + 1e-12) * mc
-                lam = lam + dlam
-                X = X + self._repartir(-m1w * dlam * nx, m2w * dlam * nx)
-                Y = Y + self._repartir(-m1w * dlam * ny, m2w * dlam * ny)
-        self.force_liens = lam / (dt * dt)
-
-        # 4. vitesses
-        vX = (X - X0) / dt
-        vY = (Y - Y0) / dt
-
-        # 5. amortissement implicite le long des liens
-        for mc in self._masques_couleur:
-            x1, y1, x2, y2 = self._paires(X, Y)
-            dx, dy = x2 - x1, y2 - y1
-            d = torch.sqrt(dx * dx + dy * dy + 1e-8)
-            nx, ny = dx / d, dy / d
-            vx1, vy1, vx2, vy2 = self._paires(vX, vY)
-            vrel = (vx2 - vx1) * nx + (vy2 - vy1) * ny
-            wsum = m1w + m2w
-            p = (vrel / (1 + dt * self._c * wsum) - vrel) / (wsum + 1e-12) * mc
-            vX = vX + self._repartir(-m1w * p * nx, m2w * p * nx)
-            vY = vY + self._repartir(-m1w * p * ny, m2w * p * ny)
-
-        self.vX = torch.clamp(vX, -self.v_max, self.v_max) * self.mask_N_exp
-        self.vY = torch.clamp(vY, -self.v_max, self.v_max) * self.mask_N_exp
-        self.X, self.Y = X, Y
+        self.X, self.Y, self.vX, self.vY, self.force_liens = self._pas(
+            self.X, self.Y, self.vX, self.vY, self._D, self._D1, self._D2, self._couleurs,
+            self.target_length, self._alpha, self._c, kN, kN * FACTEUR_TANGENTIEL, self._w,
+            self.mask_N_exp, float(dt), self.v_max, self.iterations, self.amort_integre)
