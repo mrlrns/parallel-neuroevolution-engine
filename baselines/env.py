@@ -101,6 +101,12 @@ def retours_au_repos(mega, proba, fabrique):
     return reinitialiser_rollouts(mega, tirage, fabrique)
 
 
+def options_v2(cfg):
+    """Options de la physique v2 lues dans la config (ignorées en v1)."""
+    return {"iterations": cfg.xpbd_iterations, "os_rigides": cfg.os_rigides,
+            "facteur_raideur": cfg.facteur_raideur}
+
+
 @torch.no_grad()
 def evaluer_politique(politique, dico, n, frames, cfg, device):
     """Rollout quasi-déterministe depuis le repos (politique(obs) + bruit `bruit_test`).
@@ -111,7 +117,8 @@ def evaluer_politique(politique, dico, n, frames, cfg, device):
     Retourne (récompense moyenne, déplacement moyen). Hors budget `sim_steps`."""
     env = SwimEnv(dico, n, frames, cfg.sub_step, cfg.coef_energie, cfg.coef_hauteur, device,
                   physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
-                  coef_regularite=cfg.coef_regularite, water_drag=cfg.water_drag)
+                  coef_regularite=cfg.coef_regularite, water_drag=cfg.water_drag,
+                  physique=cfg.physique, options_v2=options_v2(cfg))
     obs = env.reset()
     total = torch.zeros(env.n, device=device)
     done = False
@@ -125,7 +132,7 @@ def evaluer_politique(politique, dico, n, frames, cfg, device):
 class SwimEnv:
     def __init__(self, dico, n_envs, frame_nb, sub_step, coef_energie, coef_hauteur, device,
                  physique_compilee=False, v_max=float("inf"), coef_regularite=0.0,
-                 water_drag=0.005, reinit_explosions=False):
+                 water_drag=0.005, reinit_explosions=False, physique="v1", options_v2=None):
         assert frame_nb % DECISION_TOUTES_LES == 0, "frame_nb doit être un multiple de 5"
         self.dico = dico
         self.n = n_envs
@@ -137,7 +144,7 @@ class SwimEnv:
         self.dt = torch.tensor(1.0 / sub_step, device=device)
         self.nb_decisions = frame_nb // DECISION_TOUTES_LES
         self.mega = None
-        self._classe = classe_physique(physique_compilee)
+        self._classe = classe_physique(physique_compilee, physique, **(options_v2 or {}))
         self.v_max = v_max
         self.coef_regularite = coef_regularite
         self.water_drag = water_drag

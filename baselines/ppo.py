@@ -45,7 +45,7 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 
-from baselines.env import SwimEnv, evaluer_politique
+from baselines.env import SwimEnv, evaluer_politique, options_v2
 from brain import Brain
 from champion import charger_champion
 from config import Config, build_argparser, load_config
@@ -148,7 +148,8 @@ def entrainer(cfg: Config):
                   cfg.coef_energie, cfg.coef_hauteur, device,
                   physique_compilee=cfg.physique_compilee, v_max=cfg.v_max,
                   coef_regularite=cfg.coef_regularite,
-                  water_drag=cfg.water_drag, reinit_explosions=cfg.episodes_enchaines)
+                  water_drag=cfg.water_drag, reinit_explosions=cfg.episodes_enchaines,
+                  physique=cfg.physique, options_v2=options_v2(cfg))
     T, N = env.nb_decisions, env.n
     obs_size, act_size = champ.obs_size, champ.action_size
 
@@ -185,7 +186,8 @@ def entrainer(cfg: Config):
                                              "coef_regularite", "water_drag",
                                              "episodes_enchaines", "frames_selection",
                                              "proba_retour_repos", "symetrie", "politique_rythmique",
-                                             "periode_rythme")}},
+                                             "periode_rythme", "physique", "xpbd_iterations",
+                                             "os_rigides", "facteur_raideur")}},
     )
 
     # Tampons du rollout : [T, N, ...]

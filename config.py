@@ -90,6 +90,10 @@ class Config:
     maj_par_fenetre: bool = False   # E12 : une mise à jour Adam par fenêtre au lieu d'une par épisode
     detachement_complet: bool = False  # E12 contrôle : troncature complète en mode une-màj-par-épisode
     physique_compilee: bool = False    # MegaCreaFast + torch.compile (×3–4 sur GPU, même physique)
+    physique: str = "v1"               # "v1" (ressorts explicites) ou "v2" (contraintes XPBD, physique_v2.py)
+    xpbd_iterations: int = 1           # v2 : passes de correction des contraintes par sous-pas
+    os_rigides: bool = False           # v2 : os de souplesse nulle (longueur exactement imposée)
+    facteur_raideur: float = 1.0       # v2 : multiplie la raideur des liens (muscles plus forts)
     episodes_enchaines: bool = False   # E20 : chaque épisode repart de l'état final du précédent (train2 et PPO)
     frames_selection: int = 300        # horizon (frames, depuis le repos) de l'évaluation qui choisit le meilleur checkpoint
     symetrie: bool = False             # E22 : même commande pour les muscles miroirs (PPO)
@@ -194,6 +198,10 @@ _AIDE = {
     "maj_par_fenetre": "Une mise à jour de l'optimiseur par fenêtre de BPTT (E12) au lieu d'une par épisode",
     "detachement_complet": "Coupe aussi les chemins obs→action et previous_distance aux frontières de fenêtre",
     "physique_compilee": "Physique MegaCreaFast compilée par torch.compile (GPU ; même physique, ×3–4)",
+    "physique": "Version de la physique : v1 (ressorts explicites) ou v2 (contraintes XPBD)",
+    "xpbd_iterations": "Physique v2 : passes de correction des contraintes par sous-pas",
+    "os_rigides": "Physique v2 : os parfaitement rigides (souplesse nulle)",
+    "facteur_raideur": "Physique v2 : multiplicateur de la raideur des liens",
     "episodes_enchaines": "E20 : chaque épisode repart de l'état final du précédent au lieu du repos "
                           "(train2 : exige --maj-par-fenetre)",
     "symetrie": "E22 : les muscles images par la symétrie miroir du corps reçoivent la même commande",
@@ -250,7 +258,7 @@ _CHAMPS_PAR_SCRIPT = {
         "poids_aleatoires", "fenetre_bptt", "maj_par_fenetre",
         "detachement_complet", "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "ppo_eval_tous_les", "ppo_eval_n_envs", "bruit_test",
-        "proba_retour_repos",
+        "proba_retour_repos", "physique", "xpbd_iterations", "os_rigides", "facteur_raideur",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
@@ -261,6 +269,7 @@ _CHAMPS_PAR_SCRIPT = {
         "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "bruit_test", "proba_retour_repos",
         "symetrie", "politique_rythmique", "periode_rythme",
+        "physique", "xpbd_iterations", "os_rigides", "facteur_raideur",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",

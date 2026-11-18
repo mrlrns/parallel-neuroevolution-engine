@@ -20,7 +20,7 @@ from datetime import datetime
 
 import torch
 
-from baselines.env import evaluer_politique, recentrer, reinitialiser_explosions, retours_au_repos
+from baselines.env import evaluer_politique, options_v2, recentrer, reinitialiser_explosions, retours_au_repos
 from brain import Brain
 from champion import charger_champion
 from config import Config, build_argparser, load_config
@@ -85,7 +85,7 @@ def main():
           f"({int(champ.num_muscles - sum(champ.is_bone))} muscles, {int(sum(champ.is_bone))} os)")
     print(f"   Padding d'origine : max_noeuds={champ.max_noeuds}, max_muscles={champ.max_muscles}")
 
-    Physique = classe_physique(cfg.physique_compilee)
+    Physique = classe_physique(cfg.physique_compilee, cfg.physique, **options_v2(cfg))
 
     # We only build one brain that will be updated with all the gradients
     cerveau = Brain(champ.obs_size, champ.action_size).to(device)
@@ -114,7 +114,9 @@ def main():
             "detachement_complet": cfg.detachement_complet, "physique_compilee": cfg.physique_compilee, "v_max": cfg.v_max,
             "coef_regularite": cfg.coef_regularite, "water_drag": cfg.water_drag,
             "episodes_enchaines": ENCHAINES, "frames_selection": cfg.frames_selection,
-            "proba_retour_repos": cfg.proba_retour_repos,
+            "proba_retour_repos": cfg.proba_retour_repos, "physique": cfg.physique,
+            "xpbd_iterations": cfg.xpbd_iterations, "os_rigides": cfg.os_rigides,
+            "facteur_raideur": cfg.facteur_raideur,
         },
     )
 

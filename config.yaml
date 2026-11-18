@@ -56,6 +56,10 @@ fenetre_bptt: 10              # troncature du gradient toutes les N frames (mult
 maj_par_fenetre: false        # E12 : true = une mise à jour Adam par fenêtre (sinon une par épisode)
 detachement_complet: false    # E12 contrôle : troncature complète, toujours une màj par épisode
 physique_compilee: false      # true sur GPU : MegaCreaFast + torch.compile, même physique, ×3–4
+physique: v1                  # v1 : ressorts explicites ; v2 : contraintes XPBD (physique_v2.py)
+xpbd_iterations: 1            # v2 : passes de correction par sous-pas
+os_rigides: false             # v2 : os parfaitement rigides
+facteur_raideur: 1.0          # v2 : multiplicateur de la raideur des liens
 episodes_enchaines: false     # E20 : chaque épisode repart de l'état final du précédent (train2 : avec maj_par_fenetre)
 frames_selection: 300         # horizon de l'évaluation qui choisit le meilleur checkpoint (900 en E20)
 proba_retour_repos: 0.0       # E20b : proba qu'un rollout reparte du repos à chaque épisode enchaîné (0.1 en E20b)
