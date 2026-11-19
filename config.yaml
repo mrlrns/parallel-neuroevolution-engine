@@ -62,6 +62,12 @@ os_rigides: false             # v2 : os parfaitement rigides
 facteur_raideur: 1.0          # v2 : multiplicateur de la raideur des liens
 ancrages: false               # v2 : nœuds ancrés le long d'un os (sinon os scindés en charnières)
 morphologie_stricte: false    # v2 : refuser une morphologie invalide (sinon avertissement)
+eau: lineaire                 # v2 : lineaire (modèle v1) ou quadratique (unités physiques)
+profondeur_corps: 20.0        # v2 quadratique : profondeur de la tranche (mm)
+epaisseur_os: 5.0             # v2 quadratique : épaisseur d'un os hors triangle (mm)
+coef_trainee_normale: 2.0     # v2 quadratique : C_n
+coef_trainee_tangentielle: 0.05  # v2 quadratique : C_t
+ordre_alterne: false          # v2 : sens des couleurs alterné d'un sous-pas au suivant
 episodes_enchaines: false     # E20 : chaque épisode repart de l'état final du précédent (train2 : avec maj_par_fenetre)
 frames_selection: 300         # horizon de l'évaluation qui choisit le meilleur checkpoint (900 en E20)
 proba_retour_repos: 0.0       # E20b : proba qu'un rollout reparte du repos à chaque épisode enchaîné (0.1 en E20b)

@@ -20,7 +20,7 @@ import argparse
 
 import torch
 
-from baselines.env import SwimEnv
+from baselines.env import SwimEnv, physique_du_checkpoint
 from champion import charger_champion
 from config import Config
 from politiques import politique_depuis_checkpoint
@@ -28,11 +28,14 @@ from politiques import politique_depuis_checkpoint
 
 @torch.no_grad()
 def deplacements(chemin, frames, points, n, seed, cfg):
-    ch = charger_champion(chemin, torch.device("cpu"))
-    politique = politique_depuis_checkpoint(torch.load(chemin, map_location="cpu"), ch, torch.device("cpu"))
+    ckpt = torch.load(chemin, map_location="cpu")
+    physique, opts, sub_step = physique_du_checkpoint(ckpt, cfg)
+    ch = charger_champion(chemin, torch.device("cpu"), ancrages=opts.get("ancrages", False))
+    politique = politique_depuis_checkpoint(ckpt, ch, torch.device("cpu"))
     torch.manual_seed(seed)
-    env = SwimEnv(ch.dico, n, frames, cfg.sub_step, cfg.coef_energie, cfg.coef_hauteur,
-                  torch.device("cpu"), v_max=cfg.v_max, water_drag=cfg.water_drag)
+    env = SwimEnv(ch.dico, n, frames, sub_step, cfg.coef_energie, cfg.coef_hauteur,
+                  torch.device("cpu"), v_max=cfg.v_max, water_drag=cfg.water_drag,
+                  physique=physique, options_v2=opts)
     obs = env.reset()
     res = {}
     done = False

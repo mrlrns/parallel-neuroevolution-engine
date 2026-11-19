@@ -96,6 +96,12 @@ class Config:
     facteur_raideur: float = 1.0       # v2 : multiplie la raideur des liens (muscles plus forts)
     ancrages: bool = False             # v2 : nœuds ancrés le long d'un os (sinon os scindés en charnières)
     morphologie_stricte: bool = False  # v2 : refuser une morphologie invalide (sinon simple avertissement)
+    eau: str = "lineaire"              # v2 : "lineaire" (modèle v1) ou "quadratique" (unités physiques)
+    profondeur_corps: float = 20.0     # v2 quadratique : profondeur h de la tranche (mm)
+    epaisseur_os: float = 5.0          # v2 quadratique : épaisseur dans le plan d'un os hors triangle (mm)
+    coef_trainee_normale: float = 2.0  # v2 quadratique : C_n (plaque face au courant)
+    coef_trainee_tangentielle: float = 0.05  # v2 quadratique : C_t (frottement)
+    ordre_alterne: bool = False        # v2 : sens des couleurs alterné d'un sous-pas au suivant
     episodes_enchaines: bool = False   # E20 : chaque épisode repart de l'état final du précédent (train2 et PPO)
     frames_selection: int = 300        # horizon (frames, depuis le repos) de l'évaluation qui choisit le meilleur checkpoint
     symetrie: bool = False             # E22 : même commande pour les muscles miroirs (PPO)
@@ -206,6 +212,12 @@ _AIDE = {
     "facteur_raideur": "Physique v2 : multiplicateur de la raideur des liens",
     "ancrages": "Physique v2 : nœuds ancrés le long d'un os (sinon l'os est scindé en charnière libre)",
     "morphologie_stricte": "Physique v2 : refuser une créature qui viole les règles 1 et 2' (morphologie.py)",
+    "eau": "Physique v2 : traînée lineaire (modèle v1) ou quadratique (unités physiques : mm, 1/60 s, g)",
+    "profondeur_corps": "Physique v2, eau quadratique : profondeur h de la tranche de corps (mm)",
+    "epaisseur_os": "Physique v2, eau quadratique : épaisseur d'un os hors triangle, pour sa masse (mm)",
+    "coef_trainee_normale": "Physique v2, eau quadratique : coefficient de traînée normal C_n",
+    "coef_trainee_tangentielle": "Physique v2, eau quadratique : coefficient de traînée tangentiel C_t",
+    "ordre_alterne": "Physique v2 : parcourir les couleurs dans un sens puis dans l'autre (biais de Gauss-Seidel)",
     "episodes_enchaines": "E20 : chaque épisode repart de l'état final du précédent au lieu du repos "
                           "(train2 : exige --maj-par-fenetre)",
     "symetrie": "E22 : les muscles images par la symétrie miroir du corps reçoivent la même commande",
@@ -263,6 +275,8 @@ _CHAMPS_PAR_SCRIPT = {
         "detachement_complet", "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "ppo_eval_tous_les", "ppo_eval_n_envs", "bruit_test",
         "proba_retour_repos", "physique", "xpbd_iterations", "os_rigides", "facteur_raideur", "ancrages", "morphologie_stricte",
+        "eau", "profondeur_corps", "epaisseur_os", "coef_trainee_normale", "coef_trainee_tangentielle",
+        "ordre_alterne",
     ],
     "ppo": [
         "chemin_champion", "dossier_baselines", "dossier_runs", "seed", "sub_step",
@@ -274,6 +288,8 @@ _CHAMPS_PAR_SCRIPT = {
         "episodes_enchaines", "frames_selection", "bruit_test", "proba_retour_repos",
         "symetrie", "politique_rythmique", "periode_rythme",
         "physique", "xpbd_iterations", "os_rigides", "facteur_raideur", "ancrages", "morphologie_stricte",
+        "eau", "profondeur_corps", "epaisseur_os", "coef_trainee_normale", "coef_trainee_tangentielle",
+        "ordre_alterne",
     ],
     "check_env": [
         "chemin_champion", "seed", "sub_step", "train2_frame_nb", "train2_batch_size",

@@ -175,6 +175,9 @@ def entrainer(cfg: Config):
     optimizer = torch.optim.Adam(agent.parameters(), lr=cfg.ppo_lr, eps=1e-5)
 
     os.makedirs(cfg.dossier_baselines, exist_ok=True)
+    # physique d'entraînement, relue par les outils de rendu (tools/render_gif.py, horizon_check.py)
+    physique_ckpt = {} if cfg.physique == "v1" else {"physique": {
+        "version": cfg.physique, "sub_step": cfg.sub_step, "options_v2": options_v2(cfg)}}
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     logger = Logger(
         f"{cfg.dossier_runs}/ppo_seed{cfg.seed}_{run_id}.jsonl",
@@ -188,7 +191,9 @@ def entrainer(cfg: Config):
                                              "proba_retour_repos", "symetrie", "politique_rythmique",
                                              "periode_rythme", "physique", "xpbd_iterations",
                                              "os_rigides", "facteur_raideur", "ancrages",
-                                             "morphologie_stricte")}},
+                                             "morphologie_stricte", "eau", "profondeur_corps",
+                                             "epaisseur_os", "coef_trainee_normale",
+                                             "coef_trainee_tangentielle", "ordre_alterne")}},
     )
 
     # Tampons du rollout : [T, N, ...]
@@ -211,7 +216,7 @@ def entrainer(cfg: Config):
             if eval_score > meilleur_eval:
                 meilleur_eval = eval_score
                 chemin_meilleur = f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_best.pt"
-                torch.save(agent.checkpoint(champ), chemin_meilleur)
+                torch.save({**agent.checkpoint(champ), **physique_ckpt}, chemin_meilleur)
         else:
             eval_score = eval_depl = None
 
@@ -304,8 +309,8 @@ def entrainer(cfg: Config):
     if eval_score > meilleur_eval:
         meilleur_eval = eval_score
         chemin_meilleur = f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_best.pt"
-        torch.save(agent.checkpoint(champ), chemin_meilleur)
-    torch.save(agent.checkpoint(champ), f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_final.pt")
+        torch.save({**agent.checkpoint(champ), **physique_ckpt}, chemin_meilleur)
+    torch.save({**agent.checkpoint(champ), **physique_ckpt}, f"{cfg.dossier_baselines}/ppo_seed{cfg.seed}_final.pt")
 
     logger.close()
     print(f"\n🏆 Meilleur score d'évaluation : {meilleur_eval:.2f}")

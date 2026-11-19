@@ -101,11 +101,23 @@ def retours_au_repos(mega, proba, fabrique):
     return reinitialiser_rollouts(mega, tirage, fabrique)
 
 
+def physique_du_checkpoint(ckpt, cfg):
+    """(physique, options_v2, sub_step) pour rejouer un checkpoint : ceux enregistrés par
+    baselines/ppo.py en physique v2, sinon ceux de la config (v1 par défaut)."""
+    p = ckpt.get("physique") if isinstance(ckpt, dict) else None
+    if p:
+        return p["version"], p["options_v2"], p["sub_step"]
+    return cfg.physique, options_v2(cfg), cfg.sub_step
+
+
 def options_v2(cfg):
     """Options de la physique v2 lues dans la config (ignorées en v1)."""
     return {"iterations": cfg.xpbd_iterations, "os_rigides": cfg.os_rigides,
             "facteur_raideur": cfg.facteur_raideur, "ancrages": cfg.ancrages,
-            "morphologie_stricte": cfg.morphologie_stricte}
+            "morphologie_stricte": cfg.morphologie_stricte, "eau": cfg.eau,
+            "profondeur": cfg.profondeur_corps, "epaisseur_os": cfg.epaisseur_os,
+            "cn": cfg.coef_trainee_normale, "ct": cfg.coef_trainee_tangentielle,
+            "ordre_alterne": cfg.ordre_alterne}
 
 
 @torch.no_grad()

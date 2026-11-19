@@ -37,6 +37,33 @@ def _union_find(n):
     return trouver, unir
 
 
+def triangles_os(m1, m2, is_bone):
+    """Triangles d'os : liste de (a, b, c, [indices des 3 os]), chacun une fois."""
+    os_par_paire = {frozenset((m1[m], m2[m])): m for m in range(len(m1)) if is_bone[m] >= 0.5}
+    voisins = {}
+    for paire in os_par_paire:
+        a, b = tuple(paire)
+        voisins.setdefault(a, set()).add(b)
+        voisins.setdefault(b, set()).add(a)
+    triangles = []
+    for paire in os_par_paire:
+        a, b = sorted(paire)
+        for c in voisins[a] & voisins[b]:
+            if c > b:
+                triangles.append((a, b, c, [os_par_paire[frozenset(p)] for p in ((a, b), (a, c), (b, c))]))
+    return triangles
+
+
+def aretes_internes(m1, m2, is_bone):
+    """Os partagés par deux triangles d'os (l'arête Su–Sd du rameur) : à l'intérieur du corps,
+    l'eau ne les touche pas."""
+    compte = {}
+    for *_, liens in triangles_os(m1, m2, is_bone):
+        for m in liens:
+            compte[m] = compte.get(m, 0) + 1
+    return {m for m, n in compte.items() if n >= 2}
+
+
 def pieces_rigides(m1, m2, is_bone):
     """{indice_os: indice_pièce} : deux os sont dans la même pièce s'ils sont reliés par
     une chaîne de triangles d'os (trois nœuds reliés deux à deux par des os)."""

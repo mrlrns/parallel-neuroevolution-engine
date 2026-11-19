@@ -40,6 +40,25 @@ de Δλ devient ∇C·M⁻¹·∇Cᵀ = Σ_j w_j·D[j, m]² (pour un lien sans a
 colonnes de T somment à 1 et celles de D à 0, donc celles de T·D aussi : la conservation de
 la quantité de mouvement tient toujours. Après chaque sous-pas, x_M est recalculé par T.
 Sans ancrage, T = identité n'est pas appliquée : calcul identique à l'étape 1b.
+
+Eau quadratique (option `eau="quadratique"`, défaut "lineaire" = modèle v1) et unités
+physiques : 1 unité de longueur = 1 mm, 1 frame = 1/60 s, masse en g, ρ = 10⁻³ g/mm³ (eau).
+La créature est une tranche de profondeur h (hors du plan) ; un os est une plaque L × h.
+  - traînée sur les os seulement (les muscles ne sont que des moyens de plier les
+    articulations : ni traînée ni masse), sauf les arêtes internes (partagées par deux
+    triangles d'os, que l'eau ne touche pas) :
+        dF_n = −½ρ·C_n·h·|v_n|·v_n·dl,   dF_t = −½ρ·C_t·h·|v_t|·v_t·dl
+    intégrée sur l'os par Gauss à 2 points (s = ½ ∓ 1/(2√3), poids ½) : un os qui tourne sur
+    lui-même freine aussi. C_n ≈ 2 (plaque face au courant, Re ~ 10⁴), C_t ≈ 0.05 (frottement).
+  - implicite linéarisée en chaque point de Gauss, de masse inverse effective w_p :
+        J = −a·v / (1 + a·w_p),   a = ½ρ·C·h·(L/2)·|v|·Δt
+    (Euler implicite sur v' = −a·v à a figé) : la traînée ne peut pas inverser la vitesse,
+    quel que soit le pas.
+  - masses : flottabilité neutre (densité de l'eau). Triangle d'os : ρ·h·aire, un tiers par
+    sommet ; os hors triangle : ρ·h·L·e (épaisseur e dans le plan), moitié par extrémité.
+    Les nœuds ancrés passent leur masse aux extrémités de leur os (poids de T).
+  - raideurs : k et c sont multipliés par la masse moyenne d'un nœud m̄, ce qui garde
+    ω = √(k/m) et l'amortissement relatif de la v1 (on ne change que les unités).
 """
 
 import warnings
@@ -47,7 +66,10 @@ import warnings
 import torch
 
 from megaVecto import MegaCrea
-from morphologie import valider_morphologie
+from morphologie import aretes_internes, triangles_os, valider_morphologie
+
+RHO_EAU = 1e-3                                  # g/mm³
+GAUSS = (0.5 - 0.5 / 3 ** 0.5, 0.5 + 0.5 / 3 ** 0.5)
 
 FACTEUR_TANGENTIEL = 0.3
 
@@ -77,14 +99,16 @@ def colorier_liens(muscle1, muscle2, masque_muscles, ancrages=None):
 
 
 def pas_xpbd(X, Y, vX, vY, D, A, wsum, couleurs, target, alpha, c, kN, kT, w, mask_N, dt, v_max,
-             iterations: int, amort_integre: bool = True, T=None):
+             iterations: int, amort_integre: bool = True, T=None, quad=None):
     """Un sous-pas XPBD. Fonction pure (compilable par torch.compile).
 
     Matrices d'incidence [P, N, M] : D = +1 en m2, −1 en m1 (différences) ; A = D1 + D2
     (indicatrices des extrémités). Pour une grandeur de lien g [P, B, M], la somme sur les
     nœuds est D @ g : m2 reçoit +g, m1 reçoit −g, sans gather ni scatter. Avec des ancrages,
     D et A sont déjà composées par T [P, N, N] (x_virtuel = X @ T). wsum [P, B, M] :
-    Σ_j w_j·D[j, m]². couleurs : [C, P, B, M] (0/1)."""
+    Σ_j w_j·D[j, m]². couleurs : [C, P, B, M] (0/1). quad : None (traînée linéaire v1) ou
+    (G1, G2, wp1, wp2, an, at) pour l'eau quadratique : G = matrices des points de Gauss
+    (x_p = X @ G), wp = masses inverses effectives, an/at = ½ρ·C·h par lien (0 hors os)."""
     def diff(Z):                                        # z_m2 − z_m1, [P, B, M]
         return torch.einsum("pbn,pnm->pbm", Z, D)
 
@@ -94,18 +118,39 @@ def pas_xpbd(X, Y, vX, vY, D, A, wsum, couleurs, target, alpha, c, kN, kT, w, ma
     def projeter(Z):                                    # recalcule les nœuds ancrés
         return Z if T is None else torch.einsum("pbj,pjk->pbk", Z, T)
 
-    # 1. traînée (modèle v1, explicite) — chaque extrémité reçoit la moitié
-    dx, dy = diff(X), diff(Y)
-    d = torch.sqrt(dx * dx + dy * dy + 1e-3)
-    ux, uy = dx / d, dy / d
-    vmx = 0.5 * torch.einsum("pbn,pnm->pbm", vX, A)
-    vmy = 0.5 * torch.einsum("pbn,pnm->pbm", vY, A)
-    gN = -d * (vmx * -uy + vmy * ux) * kN
-    gT = -d * (vmx * ux + vmy * uy) * kT
-    fx = gN * -uy + gT * ux
-    fy = gN * ux + gT * uy
-    vX = vX + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fx, A)
-    vY = vY + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fy, A)
+    # 1. traînée
+    if quad is None:                    # modèle v1, explicite — chaque extrémité reçoit la moitié
+        dx, dy = diff(X), diff(Y)
+        d = torch.sqrt(dx * dx + dy * dy + 1e-3)
+        ux, uy = dx / d, dy / d
+        vmx = 0.5 * torch.einsum("pbn,pnm->pbm", vX, A)
+        vmy = 0.5 * torch.einsum("pbn,pnm->pbm", vY, A)
+        gN = -d * (vmx * -uy + vmy * ux) * kN
+        gT = -d * (vmx * ux + vmy * uy) * kT
+        fx = gN * -uy + gT * ux
+        fy = gN * ux + gT * uy
+        vX = vX + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fx, A)
+        vY = vY + dt * w * 0.5 * torch.einsum("pbm,pnm->pbn", fy, A)
+    else:                               # quadratique, 2 points de Gauss, implicite linéarisée
+        G1, G2, wp1, wp2, an, at = quad
+        dx, dy = diff(X), diff(Y)
+        d = torch.sqrt(dx * dx + dy * dy + 1e-8)
+        ux, uy = dx / d, dy / d
+        ix = torch.zeros_like(vX)
+        iy = torch.zeros_like(vY)
+        for G, wp in ((G1, wp1), (G2, wp2)):
+            px = torch.einsum("pbn,pnm->pbm", vX, G)
+            py = torch.einsum("pbn,pnm->pbm", vY, G)
+            vn = px * -uy + py * ux
+            vt = px * ux + py * uy
+            a_n = an * (0.5 * d) * torch.abs(vn) * dt
+            a_t = at * (0.5 * d) * torch.abs(vt) * dt
+            jn = -a_n * vn / (1 + a_n * wp)
+            jt = -a_t * vt / (1 + a_t * wp)
+            ix = ix + torch.einsum("pbm,pnm->pbn", jn * -uy + jt * ux, G)
+            iy = iy + torch.einsum("pbm,pnm->pbn", jn * ux + jt * uy, G)
+        vX = vX + w * ix
+        vY = vY + w * iy
 
     # 2. prédiction par inertie
     X0, Y0 = X, Y
@@ -168,57 +213,123 @@ def _pas_xpbd_compile():
 class MegaCreaXPBD(MegaCrea):
     def __init__(self, dico_mega_tenseurs, batch_size, device="cuda", iterations=1,
                  os_rigides=False, facteur_raideur=1.0, compile=False, amort_integre=True,
-                 ancrages=False, morphologie_stricte=False):
+                 ancrages=False, morphologie_stricte=False, eau="lineaire", profondeur=20.0,
+                 epaisseur_os=5.0, cn=2.0, ct=0.05, ordre_alterne=False):
+        if eau not in ("lineaire", "quadratique"):
+            raise ValueError(f"eau inconnue : {eau!r} (lineaire ou quadratique)")
         liste_ancrages = dico_mega_tenseurs.get("ancrages")
         if any(liste_ancrages or ()) and not ancrages:
             raise ValueError("créature avec points d'ancrage : activer l'option ancrages "
                              "(ou charger le champion sans, cf. morphologie.scinder_ancrages)")
         self._ancrages = liste_ancrages if ancrages and any(liste_ancrages or ()) else None
         super().__init__(dico_mega_tenseurs, batch_size, device=device)
-        self._verifier_morphologie(morphologie_stricte)
+        self.eau = eau
+        # en eau quadratique, un nœud sans os n'aurait pas de masse : règle 1 obligatoire
+        self._verifier_morphologie(morphologie_stricte, regle_1_obligatoire=eau == "quadratique")
         self.iterations = iterations
         self.amort_integre = amort_integre
         B = batch_size
         P, _, N = self.X.shape
         M = self.muscle1.shape[1]
         dev, dt_ = self.X.device, self.X.dtype
-        k = self.stiffness.unsqueeze(1).expand(-1, B, -1) * facteur_raideur        # [P, B, M]
+        T = self._matrice_ancrages(P, N, dev, dt_)
+        m_ref = 1.0
+        if eau == "quadratique":
+            self.masses = self._masses_geometriques(T, profondeur, epaisseur_os).unsqueeze(1).expand(-1, B, -1)
+            m_ref = (self.masses * (self.masses > 0)).sum(2, keepdim=True) / (self.masses > 0).sum(2, keepdim=True)
+        k = self.stiffness.unsqueeze(1).expand(-1, B, -1) * facteur_raideur * m_ref  # [P, B, M]
         os_ = self.is_bone_exp
         alpha = torch.where(k > 0, 1.0 / torch.clamp(k, min=1e-12), torch.zeros_like(k))
         if os_rigides:
             alpha = torch.where(os_ == 1.0, torch.zeros_like(alpha), alpha)
         self._alpha = alpha.contiguous()
-        self._c = (2.0 * torch.sqrt(k)).contiguous()                                # amortissement, comme la v1
+        self._c = (2.0 * torch.sqrt(k * m_ref)).contiguous()                       # amortissement, comme la v1
         # matrices d'incidence (liens fantômes : colonnes nulles)
         mk = self.masque_muscles.to(dt_).unsqueeze(1)                               # [P, 1, M]
         self._D1 = torch.zeros(P, N, M, dtype=dt_, device=dev).scatter_(1, self.muscle1.unsqueeze(1), 1.0) * mk
         self._D2 = torch.zeros(P, N, M, dtype=dt_, device=dev).scatter_(1, self.muscle2.unsqueeze(1), 1.0) * mk
         self._D = self._D2 - self._D1
         self._A = self._D1 + self._D2
-        self._w = (self.mask_N_exp / self.masses).contiguous()                     # 0 pour un nœud fantôme
-        self._T = None
-        if self._ancrages is not None:
-            T = torch.eye(N, dtype=dt_, device=dev).repeat(P, 1, 1)                 # [P, N, N]
-            m1l, m2l = self.muscle1.tolist(), self.muscle2.tolist()
+        reel = self.mask_N_exp * (self.masses > 0)
+        self._w = torch.where(reel > 0, 1.0 / torch.clamp(self.masses, min=1e-12), torch.zeros_like(reel)).contiguous()
+        self._T = T
+        D1e, D2e = self._D1, self._D2
+        if T is not None:
             for p, liste in enumerate(self._ancrages):
-                for n, o, s in liste:
-                    T[p, n, n] = 0.0
-                    T[p, m1l[p][o], n] = 1.0 - s
-                    T[p, m2l[p][o], n] = s
+                for n, _, _ in liste:
                     self._w[p, :, n] = 0.0                                          # pas de masse propre
-            self._T = T
             self._D = torch.einsum("pjk,pkm->pjm", T, self._D)
             self._A = torch.einsum("pjk,pkm->pjm", T, self._A)
+            D1e = torch.einsum("pjk,pkm->pjm", T, self._D1)
+            D2e = torch.einsum("pjk,pkm->pjm", T, self._D2)
             self._recalculer_repos()
+        self._quad = None
+        if eau == "quadratique":
+            internes = torch.zeros(P, M, dtype=dt_, device=dev)
+            m1l, m2l, os_l = self.muscle1.tolist(), self.muscle2.tolist(), self.is_bone.tolist()
+            for p in range(P):
+                for m in aretes_internes(m1l[p], m2l[p], os_l[p]):
+                    internes[p, m] = 1.0
+            mouille = (self.is_bone * self.masque_muscles * (1 - internes)).unsqueeze(1).expand(-1, B, -1)
+            G = [(1 - g) * D1e + g * D2e for g in GAUSS]
+            wp = [torch.einsum("pbn,pnm->pbm", self._w, Gi * Gi).contiguous() for Gi in G]
+            self._quad = (G[0].contiguous(), G[1].contiguous(), wp[0], wp[1],
+                          (0.5 * RHO_EAU * cn * profondeur * mouille).contiguous(),
+                          (0.5 * RHO_EAU * ct * profondeur * mouille).contiguous())
         self._wsum = torch.einsum("pbn,pnm->pbm", self._w, self._D * self._D).contiguous()
         col = colorier_liens(self.muscle1, self.muscle2, self.masque_muscles, self._ancrages)
         self._couleurs = torch.stack([(col == c).to(dt_).unsqueeze(1).expand(-1, B, -1)
                                       for c in range(int(col.max().item()) + 1)]).contiguous()
         self._facteur_trainee = ((os_ + (1 - os_) * 0.3) * self.mask_M_exp).contiguous()
+        # ordre_alterne : couleurs parcourues dans un sens puis dans l'autre d'un sous-pas au
+        # suivant. Un seul passage de Gauss-Seidel corrige toujours le même lien en premier
+        # (les deux muscles d'épaule du rameur partagent A, donc ont deux couleurs) : biais
+        # haut/bas qui fait tourner une créature symétrique. Alterner l'annule en moyenne.
+        self._couleurs_inv = self._couleurs.flip(0).contiguous() if ordre_alterne else None
+        self._sous_pas = 0
         self._pas = _pas_xpbd_compile() if compile else pas_xpbd
         self.force_liens = torch.zeros_like(k)                                      # λ/Δt² du dernier sous-pas
 
-    def _verifier_morphologie(self, stricte):
+    def _matrice_ancrages(self, P, N, dev, dt_):
+        """T [P, N, N] (x_virtuel = X @ T), ou None sans ancrage."""
+        if self._ancrages is None:
+            return None
+        T = torch.eye(N, dtype=dt_, device=dev).repeat(P, 1, 1)
+        m1l, m2l = self.muscle1.tolist(), self.muscle2.tolist()
+        for p, liste in enumerate(self._ancrages):
+            for n, o, s in liste:
+                T[p, n, n] = 0.0
+                T[p, m1l[p][o], n] = 1.0 - s
+                T[p, m2l[p][o], n] = s
+        return T
+
+    def _masses_geometriques(self, T, profondeur, epaisseur_os):
+        """Masses [P, N] en g (flottabilité neutre), calculées sur la géométrie de base."""
+        P, N = self.X_base.shape
+        masses = torch.zeros(P, N, dtype=self.X_base.dtype, device=self.X_base.device)
+        xs, ys = self.X_base.tolist(), self.Y_base.tolist()
+        m1l, m2l, os_l, mk = self.muscle1.tolist(), self.muscle2.tolist(), self.is_bone.tolist(), \
+            self.masque_muscles.tolist()
+        for p in range(P):
+            nm = int(sum(mk[p]))
+            m1, m2, os_ = m1l[p][:nm], m2l[p][:nm], os_l[p][:nm]
+            x, y = xs[p], ys[p]
+            en_triangle = set()
+            for a, b, c, liens in triangles_os(m1, m2, os_):
+                aire = 0.5 * abs((x[b] - x[a]) * (y[c] - y[a]) - (x[c] - x[a]) * (y[b] - y[a]))
+                for n in (a, b, c):
+                    masses[p, n] += RHO_EAU * profondeur * aire / 3
+                en_triangle.update(liens)
+            for m in range(nm):
+                if os_[m] >= 0.5 and m not in en_triangle:
+                    longueur = ((x[m1[m]] - x[m2[m]]) ** 2 + (y[m1[m]] - y[m2[m]]) ** 2) ** 0.5
+                    for n in (m1[m], m2[m]):
+                        masses[p, n] += 0.5 * RHO_EAU * profondeur * longueur * epaisseur_os
+        if T is not None:                                   # nœud ancré → extrémités de son os
+            masses = torch.einsum("pk,pjk->pj", masses, T)
+        return masses * self.masque_noeuds
+
+    def _verifier_morphologie(self, stricte, regle_1_obligatoire=False):
         m1l, m2l = self.muscle1.tolist(), self.muscle2.tolist()
         os_l, mk = self.is_bone.tolist(), self.masque_muscles.tolist()
         nn = self.masque_noeuds.sum(dim=1).long().tolist()
@@ -228,7 +339,7 @@ class MegaCreaXPBD(MegaCrea):
                                           self._ancrages[p] if self._ancrages else ())
             if erreurs:
                 msg = f"morphologie invalide (créature {p}) : " + " ; ".join(erreurs)
-                if stricte:
+                if stricte or (regle_1_obligatoire and any("règle 1" in e for e in erreurs)):
                     raise ValueError(msg)
                 warnings.warn(msg, stacklevel=3)
 
@@ -254,7 +365,11 @@ class MegaCreaXPBD(MegaCrea):
 
     def apply_physics(self, dt):
         kN = self.water_drag * self._facteur_trainee
+        couleurs = self._couleurs
+        if self._couleurs_inv is not None:
+            couleurs = self._couleurs_inv if self._sous_pas % 2 else self._couleurs
+            self._sous_pas += 1
         self.X, self.Y, self.vX, self.vY, self.force_liens = self._pas(
-            self.X, self.Y, self.vX, self.vY, self._D, self._A, self._wsum, self._couleurs,
+            self.X, self.Y, self.vX, self.vY, self._D, self._A, self._wsum, couleurs,
             self.target_length, self._alpha, self._c, kN, kN * FACTEUR_TANGENTIEL, self._w,
-            self.mask_N_exp, float(dt), self.v_max, self.iterations, self.amort_integre, self._T)
+            self.mask_N_exp, float(dt), self.v_max, self.iterations, self.amort_integre, self._T, self._quad)

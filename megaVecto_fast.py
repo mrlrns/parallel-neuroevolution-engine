@@ -84,6 +84,8 @@ def classe_physique(compilee, version="v1", **options_v2):
                                                                      compile=compilee, **options_v2)
     if version != "v1":
         raise ValueError(f"physique inconnue : {version!r} (v1 ou v2)")
+    if options_v2.get("eau", "lineaire") != "lineaire":
+        raise ValueError("l'eau quadratique demande la physique v2 (--physique v2)")
     if options_v2.get("ancrages"):
         raise ValueError("les points d'ancrage demandent la physique v2 (--physique v2)")
     if not compilee:
