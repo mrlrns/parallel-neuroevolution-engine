@@ -101,6 +101,7 @@ class Config:
     epaisseur_os: float = 5.0          # v2 quadratique : épaisseur dans le plan d'un os hors triangle (mm)
     coef_trainee_normale: float = 2.0  # v2 quadratique : C_n (plaque face au courant)
     coef_trainee_tangentielle: float = 0.05  # v2 quadratique : C_t (frottement)
+    coef_preactivation: float = 0.0    # E21 (train2) : pénalité β·moyenne(z²) sur les sorties avant tanh
     ordre_alterne: bool = False        # v2 : sens des couleurs alterné d'un sous-pas au suivant
     episodes_enchaines: bool = False   # E20 : chaque épisode repart de l'état final du précédent (train2 et PPO)
     frames_selection: int = 300        # horizon (frames, depuis le repos) de l'évaluation qui choisit le meilleur checkpoint
@@ -217,6 +218,7 @@ _AIDE = {
     "epaisseur_os": "Physique v2, eau quadratique : épaisseur d'un os hors triangle, pour sa masse (mm)",
     "coef_trainee_normale": "Physique v2, eau quadratique : coefficient de traînée normal C_n",
     "coef_trainee_tangentielle": "Physique v2, eau quadratique : coefficient de traînée tangentiel C_t",
+    "coef_preactivation": "E21 (train2) : pénalité β·moyenne(z²) sur les sorties avant tanh, contre la saturation",
     "ordre_alterne": "Physique v2 : parcourir les couleurs dans un sens puis dans l'autre (biais de Gauss-Seidel)",
     "episodes_enchaines": "E20 : chaque épisode repart de l'état final du précédent au lieu du repos "
                           "(train2 : exige --maj-par-fenetre)",
@@ -275,6 +277,7 @@ _CHAMPS_PAR_SCRIPT = {
         "detachement_complet", "physique_compilee", "v_max", "water_drag", "coef_regularite",
         "episodes_enchaines", "frames_selection", "ppo_eval_tous_les", "ppo_eval_n_envs", "bruit_test",
         "proba_retour_repos", "physique", "xpbd_iterations", "os_rigides", "facteur_raideur", "ancrages", "morphologie_stricte",
+        "coef_preactivation",
         "eau", "profondeur_corps", "epaisseur_os", "coef_trainee_normale", "coef_trainee_tangentielle",
         "ordre_alterne",
     ],

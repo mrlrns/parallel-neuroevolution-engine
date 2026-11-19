@@ -9,11 +9,14 @@ class Brain(nn.Module):
         self.layer2=nn.Linear(64,64)
         self.layer3=nn.Linear(64,output_size)
 
-    def forward(self,x):
-        x=torch.relu(self.layer1(x))
-        x=torch.relu(self.layer2(x))
-        x=torch.tanh(self.layer3(x))
-        return x
+    def pre_activation(self, x):
+        """z, la sortie avant le tanh (E21 : pénalité β·z² contre la saturation)."""
+        x = torch.relu(self.layer1(x))
+        x = torch.relu(self.layer2(x))
+        return self.layer3(x)
+
+    def forward(self, x):
+        return torch.tanh(self.pre_activation(x))
 
 
 

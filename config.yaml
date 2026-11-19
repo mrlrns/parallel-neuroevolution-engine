@@ -67,6 +67,7 @@ profondeur_corps: 20.0        # v2 quadratique : profondeur de la tranche (mm)
 epaisseur_os: 5.0             # v2 quadratique : épaisseur d'un os hors triangle (mm)
 coef_trainee_normale: 2.0     # v2 quadratique : C_n
 coef_trainee_tangentielle: 0.05  # v2 quadratique : C_t
+coef_preactivation: 0.0       # E21 (train2) : pénalité β·moyenne(z²) sur les sorties avant tanh
 ordre_alterne: false          # v2 : sens des couleurs alterné d'un sous-pas au suivant
 episodes_enchaines: false     # E20 : chaque épisode repart de l'état final du précédent (train2 : avec maj_par_fenetre)
 frames_selection: 300         # horizon de l'évaluation qui choisit le meilleur checkpoint (900 en E20)

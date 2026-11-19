@@ -1,0 +1,22 @@
+Device utilisé : cuda
+Symétrie imposée : 2 groupes de muscles [[7, 11], [8, 12]]
+Politique rythmique : période 40 frames
+Acteur initialisé aléatoirement
+It.    0 | score (stochastique)    -2.59 | éval    10.23 | distance    3.33 | kl 0.0058 | std 0.198
+It.   10 | score (stochastique)     8.23 | éval     6.21 | distance   13.25 | kl 0.0048 | std 0.176
+It.   20 | score (stochastique)    40.09 | éval    64.96 | distance   45.58 | kl 0.0077 | std 0.155
+It.   30 | score (stochastique)   110.43 | éval   130.81 | distance  117.76 | kl 0.0085 | std 0.123
+It.   40 | score (stochastique)   175.06 | éval   187.50 | distance  184.63 | kl 0.0056 | std 0.103
+It.   50 | score (stochastique)   216.28 | éval   227.05 | distance  227.86 | kl 0.0031 | std 0.093
+It.   60 | score (stochastique)   246.29 | éval   255.69 | distance  259.76 | kl 0.0059 | std 0.088
+It.   70 | score (stochastique)   264.86 | éval   274.53 | distance  280.00 | kl 0.0032 | std 0.085
+It.   80 | score (stochastique)   276.28 | éval   286.88 | distance  292.77 | kl 0.0009 | std 0.082
+It.   90 | score (stochastique)   281.96 | éval   291.46 | distance  299.43 | kl 0.0042 | std 0.079
+It.  100 | score (stochastique)   284.20 | éval   292.79 | distance  301.88 | kl 0.0017 | std 0.076
+It.  110 | score (stochastique)   290.74 | éval   299.18 | distance  309.57 | kl 0.0017 | std 0.073
+It.  120 | score (stochastique)   292.96 | éval   301.24 | distance  312.12 | kl 0.0026 | std 0.071
+It.  130 | score (stochastique)   294.83 | éval   302.36 | distance  313.95 | kl 0.0129 | std 0.067
+It.  140 | score (stochastique)   296.04 | éval   303.37 | distance  315.09 | kl 0.0011 | std 0.064
+
+🏆 Meilleur score d'évaluation : 304.34
+💾 /content/drive/MyDrive/watercrea/E23/T40/ppo/ppo_seed0_best.pt  (format Brain : passe dans evaluate_seeds.py)

@@ -94,6 +94,33 @@ def main():
     elif champ.brain_weights is not None:
         cerveau.load_state_dict(champ.brain_weights)
 
+    # E21 : pénalité β·moyenne(z²) sur les pré-activations des vrais muscles. Au-delà de
+    # |z| ≈ 3, a = tanh(z) ne bouge plus et tanh'(z) = 1 − a² ≈ 0 : la récompense ne retient
+    # plus z et le gradient analytique ne passe plus. La pénalité ramène z, sans interdire
+    # les commandes fortes (z = 2 donne a = 0,96). β = 0 : aucun calcul de plus.
+    BETA = cfg.coef_preactivation
+    masque_act = champ.masque_muscles_actifs.to(device)                  # [act]
+    n_act = float(masque_act.sum().clamp(min=1.0))
+    stats = {"sat": 0.0, "z": 0.0, "n": 0}
+
+    def agir(obs):
+        """(action, pénalité) : action = tanh(z), pénalité = β·moyenne(z²) sur les vrais
+        muscles et le batch. Met à jour les stats de saturation de l'épisode."""
+        z = cerveau.pre_activation(obs)
+        a = torch.tanh(z)
+        with torch.no_grad():
+            stats["sat"] += float(((a.abs() >= 0.99) * masque_act).sum() / (n_act * a.shape[1]))
+            stats["z"] += float((z.abs() * masque_act).sum() / (n_act * a.shape[1]))
+            stats["n"] += 1
+        pen = BETA * ((z * z) * masque_act).sum() / (n_act * a.shape[1]) if BETA > 0 else None
+        return a, pen
+
+    def stats_episode():
+        n = max(1, stats["n"])
+        res = {"saturation": stats["sat"] / n, "z_abs_moyen": stats["z"] / n}
+        stats.update(sat=0.0, z=0.0, n=0)
+        return res
+
     # ⚡️ L'OPTIMISEUR EST CRÉÉ UNE SEULE FOIS, HORS DE TOUTE BOUCLE
     optimizer = torch.optim.Adam(cerveau.parameters(), lr=LEARNING_RATE)
 
@@ -121,6 +148,7 @@ def main():
             "profondeur_corps": cfg.profondeur_corps, "epaisseur_os": cfg.epaisseur_os,
             "coef_trainee_normale": cfg.coef_trainee_normale,
             "coef_trainee_tangentielle": cfg.coef_trainee_tangentielle, "ordre_alterne": cfg.ordre_alterne,
+            "coef_preactivation": cfg.coef_preactivation,
         },
     )
 
@@ -160,6 +188,7 @@ def main():
         pos_depart = (torch.sum(mega.X * mega.mask_N_exp, dim=2) / nb_n).detach().clone()
 
         rewards_accumulated = None
+        pen_episode = None
         explosion = False
 
         # Bruit d'exploration décroissant : beaucoup au début, précision à la fin
@@ -180,9 +209,14 @@ def main():
             normes, nb_maj = [], 0
             exclus = torch.zeros(BATCH_SIZE, dtype=torch.bool, device=device)  # rollouts remis au repos
 
+            pen_fenetre = None
+
             def mise_a_jour():
-                nonlocal r_fenetre, nb_maj, exclus
+                nonlocal r_fenetre, nb_maj, exclus, pen_fenetre
                 loss_f = -torch.sum(r_fenetre) / BATCH_SIZE
+                if pen_fenetre is not None:
+                    loss_f = loss_f + pen_fenetre
+                    pen_fenetre = None
                 ok = bool(torch.isfinite(loss_f))
                 if ok:
                     optimizer.zero_grad()
@@ -219,7 +253,9 @@ def main():
                             explosion = True
                             break
                     obs = mega.get_observation(frame_globale + frame)
-                    action = cerveau(obs)
+                    action, pen = agir(obs)
+                    if pen is not None:
+                        pen_fenetre = pen if pen_fenetre is None else pen_fenetre + pen
                     mega.apply_action(action + torch.randn_like(action) * bruit_scale, frame_globale + frame)
                 for _ in range(SUB_STEP):
                     mega.apply_physics(dt)
@@ -264,6 +300,7 @@ def main():
                 nb_maj=nb_maj, distance_moyenne=distance_finale, bruit_scale=bruit_scale,
                 meilleur_score_global=meilleur_score_global, explosion=False,
                 eval_score_mean=eval_score, eval_distance_moyenne=eval_depl, nb_reinit=int(exclus.sum().item()),
+                **stats_episode(),
             )
             if episode % 10 == 0:
                 ev = f" | éval {eval_score:7.2f}" if eval_score is not None else ""
@@ -281,7 +318,9 @@ def main():
                     # Chemin 1 : sans ce detach, l'action de la frontière dépend de l'état
                     # de la fenêtre précédente via l'observation (fuite de gradient).
                     obs = obs.detach()
-                action = cerveau(obs)                                # [1, BATCH, action_size]
+                action, pen = agir(obs)                              # [1, BATCH, action_size]
+                if pen is not None:
+                    pen_episode = pen if pen_episode is None else pen_episode + pen
 
                 bruit = torch.randn_like(action) * bruit_scale
                 mega.apply_action(action + bruit, frame)
@@ -323,6 +362,8 @@ def main():
             continue
 
         loss = -torch.sum(rewards_accumulated) / BATCH_SIZE
+        if pen_episode is not None:
+            loss = loss + pen_episode
         # Le test NaN ne tourne que toutes les 20 frames : une explosion en fin
         # d'épisode passerait inaperçue et empoisonnerait les moments d'Adam.
         if not torch.isfinite(loss):
@@ -350,7 +391,7 @@ def main():
             episode=episode, sim_steps=sim_steps, score_mean=score_moyen, score_std=scores.std().item(),
             grad_norm=float(norm), loss=float(loss.item()),
             distance_moyenne=distance_finale, bruit_scale=bruit_scale,
-            meilleur_score_global=meilleur_score_global, explosion=False,
+            meilleur_score_global=meilleur_score_global, explosion=False, **stats_episode(),
         )
 
         if episode % 10 == 0:
