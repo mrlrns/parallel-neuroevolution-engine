@@ -117,7 +117,10 @@ def main():
             "proba_retour_repos": cfg.proba_retour_repos, "physique": cfg.physique,
             "xpbd_iterations": cfg.xpbd_iterations, "os_rigides": cfg.os_rigides,
             "facteur_raideur": cfg.facteur_raideur, "ancrages": cfg.ancrages,
-            "morphologie_stricte": cfg.morphologie_stricte,
+            "morphologie_stricte": cfg.morphologie_stricte, "eau": cfg.eau,
+            "profondeur_corps": cfg.profondeur_corps, "epaisseur_os": cfg.epaisseur_os,
+            "coef_trainee_normale": cfg.coef_trainee_normale,
+            "coef_trainee_tangentielle": cfg.coef_trainee_tangentielle, "ordre_alterne": cfg.ordre_alterne,
         },
     )
 
